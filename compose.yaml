@@ -43,6 +43,16 @@ services:
       - NUM_DRONES=${NUM_DRONES:-2}
       # Space-separated 0-indexed instances flying the sprayer role
       - SPRAYER_INSTANCES=${SPRAYER_INSTANCES:-}
+      # TAK / Cursor-on-Target bridge (docs/TAK.md). Empty TAK_URL = off.
+      # Cert paths are inside the container: put PEMs in ./tak on the host.
+      - TAK_URL=${TAK_URL:-}
+      - TAK_CERT=${TAK_CERT:-}
+      - TAK_KEY=${TAK_KEY:-}
+      - TAK_KEY_PASSWORD=${TAK_KEY_PASSWORD:-}
+      - TAK_CA=${TAK_CA:-}
+      - TAK_VIDEO_URL=${TAK_VIDEO_URL:-}
+      - TAK_GEOID_OFFSET=${TAK_GEOID_OFFSET:-}
+      - TAK_UID_PREFIX=${TAK_UID_PREFIX:-}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       #- ROS_DISCOVERY_SERVER=172.20.0.10:11888
     volumes:
@@ -50,6 +60,7 @@ services:
       - ./logs:/root/logs:delegated
       - ./src/scripts:/root/scripts:ro
       - ./src/dockerfiles/config:/root/config:ro
+      - ./tak:/root/tak:ro
 #    stdin_open: true
 #    tty: true
 #    command: [ "/bin/bash" ]

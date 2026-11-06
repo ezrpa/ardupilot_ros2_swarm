@@ -154,6 +154,25 @@ Also: in Gazebo mode content placement must use world (0,0) = field GPS
 origin (NOT the drone spawn cluster), and QGC's video widget binds UDP 5600 —
 the same port as drone 1's camera stream (port contention footgun).
 
+### TAK Integration (Cursor-on-Target)
+```bash
+TAK_URL="udp://239.2.3.1:6969" ./start_swarm.sh 4          # ATAK LAN multicast
+TAK_URL="tls://tak:8089" TAK_CERT=/root/tak/c.pem TAK_KEY=/root/tak/c.key \
+  TAK_CA=/root/tak/ca.pem ./start_swarm.sh 4                 # TAK Server mTLS
+python3 src/swarm_control/tests/test_tak_bridge.py          # no ROS needed
+```
+`tak_bridge.py` (launched in swarm_controller only when `TAK_URL` is set;
+`tak_url` launch arg) is read-only: it opens its OWN DDS participant per drone
+domain (one `rclpy.Context(domain_id=i+1)` each) on `/ap/geopose/filtered`,
+`/ap/status`, `/ap/battery`, `/ap/gps_global_origin/filtered` — not MAVLink,
+because QGC owns UDP 14550+i and the sprayer node / spray visualizer own
+SERIAL1/2 TCP. It also watches `logs/drone_*/wp_*.json` (live weed markers)
+and `logs/prescriptions/sprayer_*.json` (targets replace detections via
+`t-x-d-d` deletes). `tak_cot.py` is stdlib-only (no pytak). CoT `hae` is
+ellipsoidal: AMSL + `TAK_GEOID_OFFSET` (default −17 m at the field origin).
+Certs go in `./tak` (gitignored, mounted at `/root/tak`). AFSIM pairing
+(DIS gateway, LVC split) is a design only — see `docs/TAK.md`.
+
 ### Stopping the Swarm
 ```bash
 ./stop_swarm.sh

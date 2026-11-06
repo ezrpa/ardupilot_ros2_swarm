@@ -49,6 +49,10 @@ video port).
     `./logs/drone_<id>/`
 - **OpenCV mapping pipeline**: GStreamer decode → per-waypoint JPEG + JSON
   geotag sidecar → position-based mosaic (`stitch_field_map.py`)
+- **TAK integration** (`TAK_URL=udp://239.2.3.1:6969 ./start_swarm.sh 4`):
+  Cursor-on-Target feed of drone tracks, live weed detections, per-sprayer
+  spray targets and the survey field to ATAK/WinTAK/TAK Server (multicast,
+  TCP or mutual TLS). AFSIM pairing design in [`docs/TAK.md`](docs/TAK.md)
 - **Self-healing startup**: nodes respawn through EKF/GPS warmup races;
   arming/mode timeouts sized for multi-SITL contention
 
@@ -86,7 +90,9 @@ video port).
 | `src/custom_gz/models/base_drone_cam*` | Camera extension wrappers |
 | `src/custom_gz/worlds/swarm_drone.sdf` | Farm world with 4 camera drones |
 | `src/scripts/stitch_field_map.py` | Position-based field mosaic from geotagged frames |
+| `src/swarm_control/scripts/tak_bridge.py` / `tak_cot.py` | TAK bridge (DDS + mission logs → CoT) and stdlib CoT encoder/transports |
 | `src/swarm_control/tests/test_points_distributor.py` | Splitter balance/coverage tests |
+| `src/swarm_control/tests/test_tak_bridge.py` | CoT schema, bridge pipeline, UDP/file sender tests |
 
 ## Roadmap (toward the STTR architecture)
 

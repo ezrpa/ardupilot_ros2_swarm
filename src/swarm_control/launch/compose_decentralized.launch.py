@@ -43,6 +43,15 @@ def generate_launch_description():
                     'the sprayer models in the Gazebo world.'
     )
 
+    tak_url_arg = DeclareLaunchArgument(
+        'tak_url',
+        default_value='',
+        description='Space-separated CoT sinks for the TAK bridge, e.g. '
+                    '"udp://239.2.3.1:6969 tls://tak.example:8089". Empty = '
+                    'TAK bridge disabled. Certs/video/geoid come from TAK_* '
+                    'env vars (see docs/TAK.md).'
+    )
+
     # Docker Compose environment - SITL instances are already running
     def launch_setup(context, *args, **kwargs):
         try:
@@ -173,13 +182,33 @@ def generate_launch_description():
                     name='prescription_planner',
                 ))
 
+            # TAK bridge: CoT feed of drone tracks, weed detections and spray
+            # targets to ATAK/WinTAK/TAK Server. Read-only w.r.t. the swarm
+            # (own DDS participants per drone domain + log-file watching).
+            tak_urls = context.launch_configurations.get('tak_url', '').split()
+            if tak_urls:
+                action_list.append(ExecuteProcess(
+                    cmd=['/ros2_ws/install/swarm_control/lib/swarm_control/'
+                         'tak_bridge.py',
+                         '--url', *tak_urls,
+                         '--logs', '/root/logs',
+                         '--instances', *[str(i) for i in range(num_drones)],
+                         '--sprayers', *[str(s) for s in sprayers]],
+                    output='screen',
+                    name='tak_bridge',
+                    respawn=True,
+                    respawn_delay=5.0,
+                ))
+                action_list.append(LogInfo(
+                    msg=f"TAK bridge enabled -> {tak_urls}"))
+
             return action_list
 
         except Exception as e:
             print(f"Error in launch setup: {str(e)}")
             return [LogInfo(msg=f"Error in launch setup: {str(e)}")]
 
-    launch_actions = [num_drones_arg, rmw_arg, sprayer_instances_arg,
+    launch_actions = [num_drones_arg, rmw_arg, sprayer_instances_arg, tak_url_arg,
                       OpaqueFunction(function=launch_setup)]
 
     return LaunchDescription(launch_actions)
