@@ -127,8 +127,11 @@ class _FakeDrone:
     def __getattr__(self, name):
         if not _HAVE_ROS:
             pytest.skip("needs ROS (run inside the swarm_controller image)")
-        if name in ('is_airborne', 'rel_alt', 'distance_to'):
+        if name in ('is_airborne', 'rel_alt', 'distance_to',
+                    'setup_coordinate_transformer', 'xy_to_latlon'):
             return getattr(BaseDrone, name).__get__(self, _FakeDrone)
+        if name == 'get_logger':
+            return lambda: type("Log", (), {"info": lambda *a: None})()
         raise AttributeError(name)
 
 
@@ -168,6 +171,34 @@ def test_arrival_distance_agrees_with_sar_coordination():
         lat, lon = sar.offset_latlon(LAT, LON, dn, de)
         assert abs(d.distance_to(lat, lon)
                    - sar.distance_m(LAT, LON, lat, lon)) < 1e-6
+
+
+
+@pytest.mark.ros
+def test_waypoint_frame_is_the_shared_geo_model():
+    """BaseDrone.xy_to_latlon (every commanded waypoint) must be exactly
+    geo.offset_latlon around the frame origin, with x = north, y = east.
+    It replaced a pyproj transverse Mercator; agreement with that model is
+    checked to its ~0.26% latitude-scale difference."""
+    d = _FakeDrone(armed=True, alt_amsl=1616.0)
+    d.setup_coordinate_transformer(LAT, LON)
+    lat_n, lon_n = d.xy_to_latlon(60.0, 0.0)
+    lat_e, lon_e = d.xy_to_latlon(0.0, 60.0)
+    assert lat_n > LAT and lon_n == LON, "x must be north only"
+    assert lat_e == LAT and lon_e > LON, "y must be east only"
+    for x, y in ((60.0, 0.0), (0.0, 60.0), (-45.0, 30.0)):
+        assert d.xy_to_latlon(x, y) == geo.offset_latlon(LAT, LON, x, y)
+    try:
+        from pyproj import Transformer
+    except ImportError:
+        return
+    t = Transformer.from_crs(
+        f"+proj=tmerc +lat_0={LAT} +lon_0={LON} +k=1 +x_0=0 +y_0=0 "
+        "+ellps=WGS84 +units=m +no_defs", "EPSG:4326", always_xy=True)
+    for x, y in ((60.0, 0.0), (0.0, 60.0), (-45.0, 30.0)):
+        lon_t, lat_t = t.transform(y, x)
+        assert geo.distance_m(lat_t, lon_t, *d.xy_to_latlon(x, y)) \
+            < 0.003 * max(abs(x), abs(y))
 
 
 if __name__ == "__main__":
