@@ -12,11 +12,11 @@ from geographic_msgs.msg import GeoPoseStamped, GeoPointStamped
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
-from points_distributor import generate_circular_waypoints
-from scripts import geo
-from scripts.drone_state import DroneState, FlightMode
+from swarm_control.mission.points_distributor import generate_circular_waypoints
+from swarm_control.core import geo
+from swarm_control.core.drone_state import DroneState, FlightMode
 
-from scripts.time_out_retry import TimeoutRetry
+from swarm_control.nodes.time_out_retry import TimeoutRetry
 
 
 # A vehicle below this height above home is treated as not flying, whatever

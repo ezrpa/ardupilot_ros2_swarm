@@ -7,10 +7,11 @@ find_package(ament_cmake_core REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 
-# Python packages
-ament_python_install_package(scripts)
+# The importable package: swarm_control.{core,mission,perception,tak,nodes}
+ament_python_install_package(${PROJECT_NAME})
 
-# Install Python scripts (exclude __pycache__ directories)
+# Executables: thin entry-point wrappers, installed as lib/swarm_control/<name>.py
+# so launch files, compose and `ros2 run swarm_control <name>.py` keep working.
 file(GLOB SCRIPT_FILES_SCRIPTS
   "scripts/*.py"
 )

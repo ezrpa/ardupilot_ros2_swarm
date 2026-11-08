@@ -26,10 +26,7 @@ import math
 import os
 import time
 
-try:
-    import geo
-except ImportError:  # installed as the `scripts` python package
-    from scripts import geo
+from swarm_control.core import geo
 
 M_PER_DEG_LAT = geo.M_PER_DEG_LAT
 

@@ -31,10 +31,7 @@ import math
 import os
 import time
 
-try:
-    import geo
-except ImportError:  # installed as the `scripts` python package
-    from scripts import geo
+from swarm_control.core import geo
 
 FIELD_ORIGIN_LAT = 40.072842
 FIELD_ORIGIN_LON = -105.230575

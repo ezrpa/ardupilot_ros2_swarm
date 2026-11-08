@@ -19,17 +19,17 @@ import tempfile
 import time
 
 HERE = os.path.dirname(__file__)
-sys.path.insert(0, os.path.join(HERE, '..', 'scripts'))
+sys.path.insert(0, os.path.join(HERE, '..'))
 MODELS = os.path.join(HERE, '..', '..', 'custom_gz', 'models')
 if not os.path.isdir(MODELS):  # inside the container: compose mount
     MODELS = os.environ.get("SIM_MODELS_DIR", "/root/sim_models")
 
-import camera_processor as cp  # noqa: E402
-import synthetic_camera as sc  # noqa: E402
-import tak_cot  # noqa: E402
-import tak_viewer  # noqa: E402
-from sar_coordination import distance_m, best_detection  # noqa: E402
-import geo  # noqa: E402
+from swarm_control.perception import camera_processor as cp  # noqa: E402
+from swarm_control.perception import synthetic_camera as sc  # noqa: E402
+from swarm_control.tak import cot as tak_cot  # noqa: E402
+from swarm_control.tak import viewer as tak_viewer  # noqa: E402
+from swarm_control.mission.sar_coordination import distance_m, best_detection  # noqa: E402
+from swarm_control.core import geo  # noqa: E402
 
 SKIP = object()
 

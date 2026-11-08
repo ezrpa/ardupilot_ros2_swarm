@@ -26,10 +26,7 @@ import os
 import time
 from collections import deque
 
-try:
-    import geo
-except ImportError:  # installed as the `scripts` python package
-    from scripts import geo
+from swarm_control.core import geo
 
 NEIGHBOURS = ((1, 0), (0, 1), (-1, 0), (0, -1))   # N, E, S, W in (row, col)
 ALGORITHMS = ("bfs", "dfs")

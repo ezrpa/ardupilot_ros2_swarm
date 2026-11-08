@@ -7,9 +7,9 @@ Run directly:  python3 src/swarm_control/tests/test_points_distributor.py
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from points_distributor import generate_grid_waypoints, split_serpentine
+from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
 
 
 def check(num_drones, waypoints):

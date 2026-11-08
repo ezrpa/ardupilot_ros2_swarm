@@ -23,14 +23,14 @@ import xml.etree.ElementTree as ET
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(REPO, "tests", "fixtures")
 GOLD = os.path.join(REPO, "tests", "golden")
-SCRIPTS = os.path.join(REPO, "src", "swarm_control", "scripts")
-sys.path.insert(0, SCRIPTS)
+PKG_ROOT = os.path.join(REPO, "src", "swarm_control")
+sys.path.insert(0, PKG_ROOT)
 
-import camera_processor as cp  # noqa: E402
-import points_distributor as pd  # noqa: E402
-import sar_coordination as sar  # noqa: E402
-import sar_search  # noqa: E402
-import tak_bridge  # noqa: E402
+from swarm_control.perception import camera_processor as cp  # noqa: E402
+from swarm_control.mission import points_distributor as pd  # noqa: E402
+from swarm_control.mission import sar_coordination as sar  # noqa: E402
+from swarm_control.mission import sar_search  # noqa: E402
+from swarm_control.tak import picture as tak_bridge  # noqa: E402
 
 ORIGIN = (40.072842, -105.230575)
 FIXED_NOW = 1_800_000_000.0
@@ -81,7 +81,7 @@ def case_planner():
                          if f.startswith("wp_") and f.endswith(".json")])
                 expect.append(f"{d.split('_')[1]}:{n}")
         subprocess.run([sys.executable, "-B",
-                        os.path.join(SCRIPTS, "prescription_planner.py"),
+                        os.path.join(PKG_ROOT, "scripts", "prescription_planner.py"),
                         "--logs", tmp, "--sprayers", "2", "3", "4", "5",
                         "--expect", *expect, "--timeout", "5"],
                        check=True, capture_output=True, text=True)

@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 from launch.event_handlers import OnProcessExit
 from launch.actions import RegisterEventHandler
 
-from scripts.points_distributor import generate_grid_waypoints, split_serpentine
+from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
 
 # Shared field origin — must match LAT_BASE/LON_BASE in
 # src/scripts/start_drone_container.sh so the mapped field is centred on the

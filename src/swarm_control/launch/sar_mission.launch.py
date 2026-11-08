@@ -14,7 +14,7 @@ from launch_ros.actions import Node
 import json
 import os
 
-from scripts.points_distributor import generate_grid_waypoints, split_serpentine
+from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
 
 # Must match LAT_BASE/LON_BASE in src/scripts/start_drone_container.sh
 FIELD_ORIGIN_LAT = 40.072842

@@ -13,9 +13,9 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SCRIPTS = os.path.join(REPO, "src", "swarm_control", "scripts")
-sys.path.insert(0, SCRIPTS)
-import geo  # noqa: E402
+PKG_ROOT = os.path.join(REPO, "src", "swarm_control")
+sys.path.insert(0, PKG_ROOT)
+from swarm_control.core import geo  # noqa: E402
 
 O = (40.072842, -105.230575)
 
@@ -50,8 +50,8 @@ def test_distance_is_symmetric_metres():
 
 
 def test_modules_reexport_the_one_constant():
-    import sar_coordination
-    import tak_cot
+    from swarm_control.mission import sar_coordination
+    from swarm_control.tak import cot as tak_cot
     assert sar_coordination.M_PER_DEG_LAT == geo.M_PER_DEG_LAT
     assert tak_cot.M_PER_DEG_LAT == geo.M_PER_DEG_LAT
     assert sar_coordination.distance_m is geo.distance_m

@@ -17,3 +17,5 @@ test-results/
 # Python bytecode
 __pycache__/
 *.py[cod]
+.ruff_cache/
+.mypy_cache/

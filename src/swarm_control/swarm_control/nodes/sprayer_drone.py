@@ -21,7 +21,8 @@ import json
 import os
 import time
 
-from base_drone_dds import BaseDrone, main
+from swarm_control.nodes.base_drone import BaseDrone
+from swarm_control.nodes.base_drone import main as run_node
 
 try:
     from pymavlink import mavutil
@@ -191,5 +192,10 @@ class SprayerDrone(BaseDrone):
             self.set_spray(False)
 
 
+
+def main(args=None):
+    run_node(args, node_class=SprayerDrone)
+
+
 if __name__ == '__main__':
-    main(node_class=SprayerDrone)
+    main()

@@ -10,10 +10,10 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'scripts'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import tak_cot  # noqa: E402
-from tak_bridge import SwarmTakBridge, FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON  # noqa: E402
+from swarm_control.tak import cot as tak_cot  # noqa: E402
+from swarm_control.tak.picture import SwarmTakBridge, FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON  # noqa: E402
 
 
 def parse(xml):
@@ -176,7 +176,7 @@ def test_unreachable_tcp_is_harmless():
 def test_sar_page_survives_link_outage():
     """The SURVIVOR FOUND GeoChat is sent once. If the TAK link is down at
     that moment (send() returns False), it must be retried, not lost."""
-    from tak_bridge import SinkFanout
+    from swarm_control.tak.picture import SinkFanout
 
     class FlakySink:
         url = "tls://flaky:8089"

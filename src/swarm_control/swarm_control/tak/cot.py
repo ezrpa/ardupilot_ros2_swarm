@@ -38,10 +38,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from xml.sax.saxutils import quoteattr, escape
 
-try:
-    import geo
-except ImportError:  # installed as the `scripts` python package
-    from scripts import geo
+from swarm_control.core import geo
 
 UNKNOWN_ERR = 9999999.0
 

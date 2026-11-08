@@ -18,9 +18,9 @@ import cv2
 import numpy as np
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(REPO, "src", "swarm_control", "scripts"))
-from camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
-import geo  # noqa: E402
+sys.path.insert(0, os.path.join(REPO, "src", "swarm_control"))
+from swarm_control.perception.camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
+from swarm_control.core import geo  # noqa: E402
 
 CP = CameraProcessor(0, 0)  # udp_port=0 -> no stream, detection still usable
 
@@ -107,7 +107,7 @@ class SkipTest(Exception):
 
 
 try:
-    from base_drone_dds import BaseDrone  # needs rclpy + ardupilot_msgs
+    from swarm_control.nodes.base_drone import BaseDrone  # needs rclpy + ardupilot_msgs
     _HAVE_ROS = True
 except Exception:  # noqa: BLE001 - host has no ROS; container does
     BaseDrone = None
@@ -165,7 +165,7 @@ def test_arrival_distance_agrees_with_sar_coordination():
     """BaseDrone.distance_to (mission arrival) and sar_coordination.distance_m
     (SAR rally arrival) once used different metres-per-degree (111320 vs
     111111): the same point read ~0.2% differently depending on the caller."""
-    import sar_coordination as sar
+    from swarm_control.mission import sar_coordination as sar
     d = _FakeDrone(armed=True, alt_amsl=1616.0)
     for dn, de in ((100.0, 0.0), (0.0, 100.0), (-60.0, 45.0)):
         lat, lon = sar.offset_latlon(LAT, LON, dn, de)

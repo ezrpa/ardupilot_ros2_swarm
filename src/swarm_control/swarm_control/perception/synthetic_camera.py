@@ -25,12 +25,8 @@ import json
 import math
 import os
 
-try:
-    from scripts import camera_processor as cp
-    from scripts import geo
-except ImportError:  # host-side tests run with scripts/ on sys.path
-    import camera_processor as cp
-    import geo
+from swarm_control.perception import camera_processor as cp
+from swarm_control.core import geo
 
 DEFAULT_MODELS_DIR = "/root/sim_models"
 FRAME_W, FRAME_H = 640, 480     # base_drone_cam/model.sdf image size

@@ -12,8 +12,9 @@ this subclass adds:
 Camera failures are non-fatal by design: if OpenCV, GStreamer, or the stream
 is unavailable the drone flies its mission exactly like a BaseDrone.
 """
-from base_drone_dds import BaseDrone, main
-from scripts.synthetic_camera import make_camera
+from swarm_control.nodes.base_drone import BaseDrone
+from swarm_control.nodes.base_drone import main as run_node
+from swarm_control.perception.synthetic_camera import make_camera
 
 
 class CameraDrone(BaseDrone):
@@ -43,5 +44,10 @@ class CameraDrone(BaseDrone):
         super().destroy_node()
 
 
+
+def main(args=None):
+    run_node(args, node_class=CameraDrone)
+
+
 if __name__ == '__main__':
-    main(node_class=CameraDrone)
+    main()

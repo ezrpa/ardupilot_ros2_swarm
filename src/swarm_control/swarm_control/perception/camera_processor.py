@@ -20,10 +20,7 @@ import os
 import threading
 import time
 
-try:
-    import geo
-except ImportError:  # installed as the `scripts` python package
-    from scripts import geo
+from swarm_control.core import geo
 
 try:
     import cv2

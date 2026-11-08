@@ -10,9 +10,9 @@ import cv2
 import numpy as np
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(REPO, "src", "swarm_control", "scripts"))
-from camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
-import geo  # noqa: E402
+sys.path.insert(0, os.path.join(REPO, "src", "swarm_control"))
+from swarm_control.perception.camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
+from swarm_control.core import geo  # noqa: E402
 
 # udp_port=0 -> no stream is opened; detection methods still usable.
 CP = CameraProcessor(0, 0)

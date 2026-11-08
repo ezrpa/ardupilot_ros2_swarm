@@ -33,13 +33,12 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, unquote
 
-try:
-    import geo
-except ImportError:  # installed as the `scripts` python package
-    from scripts import geo
+from swarm_control.core import geo
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-PAGE_CANDIDATES = [os.path.join(HERE, "..", "viewer", "index.html"),
+HERE = os.path.dirname(os.path.realpath(__file__))
+# src/swarm_control/viewer/index.html, relative to this module
+# (src/swarm_control/swarm_control/tak/viewer.py).
+PAGE_CANDIDATES = [os.path.join(HERE, "..", "..", "viewer", "index.html"),
                    os.path.join(HERE, "viewer", "index.html")]
 TRAIL_MAX = 900            # points kept per track (~15 min at 1 Hz)
 FOOTPRINT_STEP_M = 12.0    # new coverage footprint every N m of search travel

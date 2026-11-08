@@ -23,10 +23,9 @@ import xml.etree.ElementTree as ET
 HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(HERE)                       # src/swarm_control
 REPO = os.path.dirname(os.path.dirname(PKG))
-sys.path.insert(0, os.path.join(PKG, "scripts"))
-sys.path.insert(0, PKG)                           # `scripts` package
+sys.path.insert(0, PKG)                           # the swarm_control package
 
-import sar_coordination as sar  # noqa: E402
+from swarm_control.mission import sar_coordination as sar  # noqa: E402
 
 try:
     import cv2
@@ -94,7 +93,7 @@ def test_person_detector_vs_farm_palette():
     if not _CV:
         print("  (skipped: cv2/numpy not installed)")
         return
-    from camera_processor import (detect_color_blobs, PERSON_HSV_LOW,
+    from swarm_control.perception.camera_processor import (detect_color_blobs, PERSON_HSV_LOW,
                                   PERSON_HSV_HIGH, PERSON_MIN_AREA_PX,
                                   CAMERA_HFOV_RAD)
 
@@ -234,7 +233,7 @@ class FakeCamera:
 
 def _make_drone(SearchDrone, inst, swarm, wps, logs, person, algo="strips",
                 start=None):
-    import sar_search
+    from swarm_control.mission import sar_search
     d = SearchDrone.__new__(SearchDrone)       # skip ROS-bound __init__
     d.search_algo, d.logs_dir = algo, logs
     d.grid = sar_search.Grid(LAT0, LON0, 120.0, 7)
@@ -273,9 +272,9 @@ def _make_drone(SearchDrone, inst, swarm, wps, logs, person, algo="strips",
 
 def test_end_to_end_search_call_rally():
     _stub_ros()
-    from search_drone_dds import SearchDrone
-    from points_distributor import generate_grid_waypoints, split_serpentine
-    import tak_bridge
+    from swarm_control.nodes.search_drone import SearchDrone
+    from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
+    from swarm_control.tak import picture as tak_bridge
 
     gt = json.load(open(os.path.join(REPO, "src", "custom_gz", "models",
                                      "missing_person", "ground_truth.json")))
@@ -336,9 +335,9 @@ def test_end_to_end_search_call_rally():
 
 def test_not_found_everyone_completes_and_rtls():
     _stub_ros()
-    from search_drone_dds import SearchDrone
-    from points_distributor import generate_grid_waypoints, split_serpentine
-    import tak_bridge
+    from swarm_control.nodes.search_drone import SearchDrone
+    from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
+    from swarm_control.tak import picture as tak_bridge
     far = sar.offset_latlon(LAT0, LON0, 500.0, 500.0)   # outside the area
     chunks = split_serpentine(
         generate_grid_waypoints(field_size=120.0, grid_points=7,
@@ -362,8 +361,8 @@ def test_grid_search_from_separate_launch_points():
     """BFS and DFS: drones start at different corners, claim cells, never
     search one twice, and still find + confirm + rally on the person."""
     _stub_ros()
-    from search_drone_dds import SearchDrone
-    import sar_search
+    from swarm_control.nodes.search_drone import SearchDrone
+    from swarm_control.mission import sar_search
     gt = json.load(open(os.path.join(REPO, "src", "custom_gz", "models",
                                      "missing_person", "ground_truth.json")))
     person = (gt["person"]["lat"], gt["person"]["lon"])

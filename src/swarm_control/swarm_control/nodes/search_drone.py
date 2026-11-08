@@ -33,12 +33,13 @@ import rclpy
 from geographic_msgs.msg import GeoPoseStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
-from base_drone_dds import BaseDrone, main
-from scripts.camera_processor import PERSON_SHAPE_DETECTORS
-from scripts.synthetic_camera import make_camera
-from scripts.drone_state import DroneState, FlightMode
-from scripts import sar_coordination as sar
-from scripts import sar_search
+from swarm_control.nodes.base_drone import BaseDrone
+from swarm_control.nodes.base_drone import main as run_node
+from swarm_control.perception.camera_processor import PERSON_SHAPE_DETECTORS
+from swarm_control.perception.synthetic_camera import make_camera
+from swarm_control.core.drone_state import DroneState, FlightMode
+from swarm_control.mission import sar_coordination as sar
+from swarm_control.mission import sar_search
 
 
 class SearchDrone(BaseDrone):
@@ -374,5 +375,10 @@ class SearchDrone(BaseDrone):
         super().destroy_node()
 
 
+
+def main(args=None):
+    run_node(args, node_class=SearchDrone)
+
+
 if __name__ == '__main__':
-    main(node_class=SearchDrone)
+    main()

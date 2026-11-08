@@ -38,8 +38,8 @@ ORIGIN_LAT = 40.072842
 ORIGIN_LON = -105.230575
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                "..", "swarm_control", "scripts"))
-import geo  # noqa: E402
+                                "..", "swarm_control"))
+from swarm_control.core import geo  # noqa: E402
 
 
 def latlon_to_xy(lat, lon):
