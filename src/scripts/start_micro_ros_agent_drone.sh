@@ -5,8 +5,9 @@ set -e
 # Environment variables from Docker Compose
 INSTANCE=${INSTANCE:-0}
 NUM_DRONES=${NUM_DRONES:-2}
-ROS_DOMAIN_ID=$((INSTANCE+1))
-MICRO_ROS_AGENT_PORT=$((2019+INSTANCE))
+# Passed by start_swarm.sh from core/config.py (the one contract module).
+: "${ROS_DOMAIN_ID:?set by start_swarm.sh}"
+: "${MICRO_ROS_AGENT_PORT:?set by start_swarm.sh}"
 
 echo "=== Micro ROS Agent Drone ${INSTANCE} Starting ==="
 echo "NUM_DRONES: ${NUM_DRONES}"

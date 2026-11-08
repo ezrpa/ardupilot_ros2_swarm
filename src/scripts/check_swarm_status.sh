@@ -3,11 +3,12 @@
 #
 # Checks what actually indicates health (instance i = 0..N-1, per
 # start_drone_container.sh):
-#   * MAVLink: a HEARTBEAT on MAVProxy's UDP output 14550+i (mode, armed).
+#   * MAVLink: a HEARTBEAT on MAVProxy's UDP output (mode, armed).
 #     MAVProxy pushes UDP; a TCP probe of that port is always "closed", which
 #     is why the old version of this script reported healthy drones as failed.
-#   * ROS 2: nodes in the drone's own domain, ROS_DOMAIN_ID = i+1.
-#     The default domain 0 is empty by design.
+#   * ROS 2: nodes in the drone's own domain (the default domain 0 is
+#     empty by design).
+# Ports and domains come from core/config.py (the one contract module).
 
 NUM_DRONES=${1:-4}
 if ! [[ "$NUM_DRONES" =~ ^[1-9][0-9]*$ ]]; then
@@ -26,9 +27,12 @@ else
 fi
 echo
 
-echo "=== MAVLink heartbeat (UDP 14550+i, 3 s each) ==="
+CONFIG_PY="$(dirname "$0")/../swarm_control/swarm_control/core/config.py"
+echo "=== MAVLink heartbeat (MAVProxy UDP port per instance, 3 s each) ==="
 for i in $(seq 0 $((NUM_DRONES - 1))); do
-    port=$((14550 + i))
+    INSTANCE_ENV=$(python3 "$CONFIG_PY" env --instance "$i")
+    eval "$INSTANCE_ENV"
+    port=$MAVPROXY_UDP_PORT
     python3 - "$i" "$port" <<'PY'
 import sys
 inst, port = int(sys.argv[1]), int(sys.argv[2])
@@ -54,13 +58,15 @@ PY
 done
 echo
 
-echo "=== ROS 2 nodes per drone domain (ROS_DOMAIN_ID = i+1) ==="
+echo "=== ROS 2 nodes per drone domain ==="
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx swarm_controller; then
     for i in $(seq 0 $((NUM_DRONES - 1))); do
+        INSTANCE_ENV=$(python3 "$CONFIG_PY" env --instance "$i")
+        eval "$INSTANCE_ENV"
         nodes=$(docker exec swarm_controller bash -c \
-            "source /opt/ros/humble/setup.bash && ROS_DOMAIN_ID=$((i + 1)) timeout 6 ros2 node list" 2>/dev/null \
+            "source /opt/ros/humble/setup.bash && ROS_DOMAIN_ID=$ROS_DOMAIN_ID timeout 6 ros2 node list" 2>/dev/null \
             | tr '\n' ' ')
-        echo "instance $i (domain $((i + 1))): ${nodes:-NO NODES}"
+        echo "instance $i (domain $ROS_DOMAIN_ID): ${nodes:-NO NODES}"
     done
 else
     echo "swarm_controller not running"

@@ -26,10 +26,10 @@ import math
 import os
 
 from swarm_control.perception import camera_processor as cp
-from swarm_control.core import geo
+from swarm_control.core import config, geo
 
 DEFAULT_MODELS_DIR = "/root/sim_models"
-FRAME_W, FRAME_H = 640, 480     # base_drone_cam/model.sdf image size
+FRAME_W, FRAME_H = config.CAMERA_WIDTH_PX, config.CAMERA_HEIGHT_PX
 METERS_PER_DEG_LAT = geo.M_PER_DEG_LAT  # georef and projection share geo
 
 # Colours are BGR. Each must fall inside its detector's HSV band

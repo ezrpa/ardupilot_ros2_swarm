@@ -29,17 +29,13 @@ try:
 except ImportError:
     sys.exit("OpenCV required: pip install opencv-python (or apt python3-opencv)")
 
-# Must match the camera in src/custom_gz/models/base_drone_cam*/model.sdf
-HFOV_RAD = 1.2
-IMG_W, IMG_H = 640, 480
-
-# Shared field origin (see compose_decentralized.launch.py)
-ORIGIN_LAT = 40.072842
-ORIGIN_LON = -105.230575
-
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "swarm_control"))
-from swarm_control.core import geo  # noqa: E402
+from swarm_control.core import config, geo  # noqa: E402
+
+HFOV_RAD = config.CAMERA_HFOV_RAD
+IMG_W, IMG_H = config.CAMERA_WIDTH_PX, config.CAMERA_HEIGHT_PX
+ORIGIN_LAT, ORIGIN_LON = config.FIELD_ORIGIN_LAT, config.FIELD_ORIGIN_LON
 
 
 def latlon_to_xy(lat, lon):

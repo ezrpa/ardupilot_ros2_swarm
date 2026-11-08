@@ -7,18 +7,14 @@ from launch_ros.actions import Node
 from launch.event_handlers import OnProcessExit
 from launch.actions import RegisterEventHandler
 
+from swarm_control.core import config
 from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
 
-# Shared field origin — must match LAT_BASE/LON_BASE in
-# src/scripts/start_drone_container.sh so the mapped field is centred on the
-# swarm's home area. All drones convert waypoints with this ONE origin so the
-# 1/n chunks tile a single field instead of shifting with each drone's home.
-FIELD_ORIGIN_LAT = 40.072842
-FIELD_ORIGIN_LON = -105.230575
-
-# GstCameraPlugin stream ports: drone instance i streams H.264/RTP on
-# CAMERA_PORT_BASE + i (see src/custom_gz/models/base_drone*/model.sdf).
-CAMERA_PORT_BASE = 5600
+# All drones convert waypoints with the ONE shared field origin
+# (core/config.py) so the 1/n chunks tile a single field instead of shifting
+# with each drone's home.
+FIELD_ORIGIN_LAT = config.FIELD_ORIGIN_LAT
+FIELD_ORIGIN_LON = config.FIELD_ORIGIN_LON
 
 
 def generate_launch_description():
@@ -62,7 +58,6 @@ def generate_launch_description():
                 int(s) for s in
                 context.launch_configurations.get('sprayer_instances', '').split()
             }
-            base_mavlink_port = 14550
             base_ros_port = 14551
 
             action_list = []
@@ -92,12 +87,11 @@ def generate_launch_description():
             # Create ROS nodes for each drone
             drone_nodes = []
             for i in range(num_drones):
-                drone_id = i + 1
+                drone_id = config.sysid(i)
                 instance = i
                 is_sprayer = i in sprayer_instances
-                # Each drone gets its own ROS_DOMAIN_ID (INSTANCE + 1)
-                ros_domain_id = str(drone_id)
-                mavlink_port = base_mavlink_port + (i * 10)
+                # Each drone gets its own ROS domain (core/config.py)
+                ros_domain_id = str(config.ros_domain_id(i))
                 ros_port = base_ros_port + (i * 10)
                 wp_json = json.dumps(chunk_for[i])
 
@@ -109,14 +103,13 @@ def generate_launch_description():
                     'mavlink_connection': f'udp:localhost:{ros_port}',
                     'assigned_waypoints': wp_json,
                     'instance': instance,
-                    'mavlink_port': mavlink_port,
                     'ros_port': ros_port,
                     'field_origin_lat': FIELD_ORIGIN_LAT,
                     'field_origin_lon': FIELD_ORIGIN_LON,
                 }
                 if is_sprayer:
                     executable = 'sprayer_drone_dds.py'
-                    params['mavlink_tcp_port'] = 5762 + 10 * instance
+                    params['mavlink_tcp_port'] = config.serial1_tcp_port(instance)
                     # Targeted spraying: wait on the ground for the planner's
                     # prescription (weed clusters from the mappers' survey);
                     # assigned_waypoints stays as the blanket-strip fallback.
@@ -125,7 +118,7 @@ def generate_launch_description():
                     params['prescription_timeout'] = 600.0
                 else:
                     executable = 'camera_drone_dds.py'
-                    params['camera_port'] = CAMERA_PORT_BASE + instance
+                    params['camera_port'] = config.camera_udp_port(instance)
 
                 drone_node = Node(
                     package='swarm_control',

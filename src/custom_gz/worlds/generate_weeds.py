@@ -22,13 +22,13 @@ import sys
 # Local metres <-> GPS comes from the shared geo module (ArduPilot/SITL model).
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "..", "swarm_control"))
-from swarm_control.core import geo  # noqa: E402
+from swarm_control.core import config, geo  # noqa: E402
 
 # Must match LAT_BASE/LON_BASE in src/scripts/start_drone_container.sh and
 # FIELD_ORIGIN_LAT/LON in compose_decentralized.launch.py. The field origin
 # corresponds to Gazebo (45, 50) — drone 0's spawn/home.
-LAT_BASE = 40.072842
-LON_BASE = -105.230575
+LAT_BASE = config.FIELD_ORIGIN_LAT
+LON_BASE = config.FIELD_ORIGIN_LON
 
 DIAMETER_MIN = 1.2
 DIAMETER_MAX = 2.5

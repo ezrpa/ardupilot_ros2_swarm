@@ -12,6 +12,7 @@ import os
 import threading
 import time
 
+from swarm_control.core import config
 from swarm_control.tak.cot import (MAGENTA, SPRAYER_PALETTE, argb,
                                    casevac_event, chat_event, course_speed,
                                    delete_event, drone_event, ne_to_latlon,
@@ -22,9 +23,8 @@ from swarm_control.tak.cot import (MAGENTA, SPRAYER_PALETTE, argb,
 CELL_PALETTE = [(70, 56, 214, 245), (70, 245, 184, 61), (70, 163, 230, 53),
                 (70, 192, 132, 252), (70, 244, 114, 182), (70, 96, 165, 250)]
 
-# Must match compose_decentralized.launch.py / start_drone_container.sh
-FIELD_ORIGIN_LAT = 40.072842
-FIELD_ORIGIN_LON = -105.230575
+FIELD_ORIGIN_LAT = config.FIELD_ORIGIN_LAT
+FIELD_ORIGIN_LON = config.FIELD_ORIGIN_LON
 # Geoid undulation N at the field origin (EGM96, Boulder CO ~ -17 m).
 # CoT hae = AMSL + N. Site-specific: change it with the field origin.
 DEFAULT_GEOID_OFFSET = -17.0

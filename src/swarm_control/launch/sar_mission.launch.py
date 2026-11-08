@@ -14,12 +14,11 @@ from launch_ros.actions import Node
 import json
 import os
 
+from swarm_control.core import config
 from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
 
-# Must match LAT_BASE/LON_BASE in src/scripts/start_drone_container.sh
-FIELD_ORIGIN_LAT = 40.072842
-FIELD_ORIGIN_LON = -105.230575
-CAMERA_PORT_BASE = 5600
+FIELD_ORIGIN_LAT = config.FIELD_ORIGIN_LAT
+FIELD_ORIGIN_LON = config.FIELD_ORIGIN_LON
 
 # Search area: SEARCH_AREA_M square centred on the field origin. Must match
 # generate_missing_person.py --area. 7x7 grid -> 20 m spacing; the camera
@@ -53,18 +52,18 @@ def launch_setup(context, *args, **kwargs):
         node = Node(
             package='swarm_control',
             executable='search_drone_dds.py',
-            name=f'drone{i + 1}',
+            name=f'drone{config.sysid(i)}',
             output='screen',
             respawn=True,          # EKF/GPS warmup races, as in mapping
             respawn_delay=5.0,
             parameters=[{
-                'drone_id': i + 1,
+                'drone_id': config.sysid(i),
                 'instance': i,
                 'swarm_instances': ' '.join(str(j) for j in instances),
                 'assigned_waypoints': json.dumps(chunks[i]),
                 'field_origin_lat': FIELD_ORIGIN_LAT,
                 'field_origin_lon': FIELD_ORIGIN_LON,
-                'camera_port': CAMERA_PORT_BASE + i,
+                'camera_port': config.camera_udp_port(i),
                 'logs_dir': '/root/logs',
                 'search_alt': SEARCH_ALT,
                 'confirm_alt': CONFIRM_ALT,
@@ -72,7 +71,7 @@ def launch_setup(context, *args, **kwargs):
                 'search_area_m': SEARCH_AREA_M,
                 'search_grid': SEARCH_GRID,
             }],
-            additional_env={'ROS_DOMAIN_ID': str(i + 1),
+            additional_env={'ROS_DOMAIN_ID': str(config.ros_domain_id(i)),
                             'RMW_IMPLEMENTATION': rmw},
         )
         actions.append(TimerAction(period=i * 5.0, actions=[node]))

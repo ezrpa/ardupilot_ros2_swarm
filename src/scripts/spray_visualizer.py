@@ -17,9 +17,15 @@ Usage:
 import argparse
 import subprocess
 import threading
+import os
+import sys
 import time
 
 from pymavlink import mavutil
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "swarm_control"))
+from swarm_control.core import config  # noqa: E402
 
 PUMP_ON_PWM = 1150  # pump servo PWM above this counts as "spraying"
 
@@ -33,7 +39,7 @@ def gz_pub(instance, emitting):
 
 
 def watch_instance(instance):
-    port = 5763 + 10 * instance
+    port = config.serial2_tcp_port(instance)
     state = None
     while True:
         try:

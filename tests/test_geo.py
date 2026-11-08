@@ -15,9 +15,9 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PKG_ROOT = os.path.join(REPO, "src", "swarm_control")
 sys.path.insert(0, PKG_ROOT)
-from swarm_control.core import geo  # noqa: E402
+from swarm_control.core import config, geo  # noqa: E402
 
-O = (40.072842, -105.230575)
+O = (config.FIELD_ORIGIN_LAT, config.FIELD_ORIGIN_LON)
 
 
 def test_constant_is_ardupilot_latlon_to_m():

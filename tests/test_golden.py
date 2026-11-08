@@ -26,13 +26,14 @@ GOLD = os.path.join(REPO, "tests", "golden")
 PKG_ROOT = os.path.join(REPO, "src", "swarm_control")
 sys.path.insert(0, PKG_ROOT)
 
+from swarm_control.core import config  # noqa: E402
 from swarm_control.perception import camera_processor as cp  # noqa: E402
 from swarm_control.mission import points_distributor as pd  # noqa: E402
 from swarm_control.mission import sar_coordination as sar  # noqa: E402
 from swarm_control.mission import sar_search  # noqa: E402
 from swarm_control.tak import picture as tak_bridge  # noqa: E402
 
-ORIGIN = (40.072842, -105.230575)
+ORIGIN = (config.FIELD_ORIGIN_LAT, config.FIELD_ORIGIN_LON)
 FIXED_NOW = 1_800_000_000.0
 REL_TOL = 1e-9
 ABS_TOL = 1e-9

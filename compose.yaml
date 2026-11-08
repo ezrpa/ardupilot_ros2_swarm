@@ -122,6 +122,8 @@ services:
     volumes:
       - ./src/swarm_control/parameters:/config
       - ./src/scripts:/root/scripts:ro
+      # core/config.py: ports, IDs and SITL home (the one contract module)
+      - ./src/swarm_control/swarm_control/core:/root/swarm_core:ro
     command: ["/root/scripts/start_drone_container.sh"]
 
 

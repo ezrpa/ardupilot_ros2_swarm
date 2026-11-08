@@ -2,57 +2,22 @@
 
 set -e
 
-LAT_BASE=40.072842
-LON_BASE=-105.230575
-ALT_BASE=1586
 # Spawn heading in degrees. Overridable so a vehicle can be started facing a
 # known direction to validate heading-dependent code (e.g. the body-frame ->
 # north/east rotation in camera_processor.py).
 YAW=${YAW:-0}
 
-# Environment variables from Docker Compose
-# When scaling with docker compose, INSTANCE should be passed as an env var
+# Environment variables from Docker Compose / start_swarm.sh
 INSTANCE=${INSTANCE:-0}
 NUM_DRONES=${NUM_DRONES:-2}
 
-# Calculate derived values
-SYSID_THISMAV=${SYSID_THISMAV:-$((INSTANCE+1))}
-ROS_DOMAIN_ID=$((INSTANCE+1))
-MICRO_ROS_AGENT_PORT=$((2019+INSTANCE))
-
-# Home position. Built-in SITL physics: offset each drone ~5 m so the
-# simulated airframes don't stack (0.000045 deg ~= 5 m).
-# Gazebo mode: NO offsets — physical separation comes from the world spawn
-# poses, and SITL reports GPS = home + world position. Per-instance home
-# offsets would make the same world point read different GPS on different
-# drones (up to ~25 m for instance 5), skewing detections and spray targets.
-if [ "${USE_GAZEBO:-0}" = "1" ]; then
-    LAT_OFFSET=40.072842
-    LON_OFFSET=-105.230575
-elif [ "${SPAWN_LAYOUT:-}" = "corners" ]; then
-    # Separate launch points (SAR grid search): the corners of the
-    # SPAWN_AREA_M square around the field origin, inset 8 m, then the edge
-    # midpoints. Must match sar_search.launch_points().
-    read LAT_OFFSET LON_OFFSET < <(awk -v inst="$INSTANCE" -v size="${SPAWN_AREA_M:-120}" 'BEGIN{
-        h = size / 2 - 8
-        split(h" "h" "(-h)" "(-h)" "h" "(-h)" "(-h)" "h" 0 "h" 0 "(-h)" "h" 0 "(-h)" 0", v, " ")
-        k = inst % 8; n = v[2*k+1]; e = v[2*k+2]
-        lat0 = 40.072842; lon0 = -105.230575
-        m = 111318.84502145034   # ArduPilot LATLON_TO_M, same as geo.py
-        dlat = n / m
-        printf "%.7f %.7f\n", lat0 + dlat, lon0 + e / (m * cos((lat0 + dlat / 2) * 3.14159265358979 / 180))
-    }')
-else
-    LAT_OFFSET=$(awk -v base=40.072842 -v inst="$INSTANCE" 'BEGIN{printf "%.6f", base + (inst * 0.000045)}')
-    LON_OFFSET=$(awk -v base=-105.230575 -v inst="$INSTANCE" 'BEGIN{printf "%.6f", base + (inst * 0.000045)}')
-fi
-
-# Calculated ports
-MAVLINK_TCP_PORT=$((5760 + 10 * INSTANCE))
-SITL_PORT=$((5501 + 10 * INSTANCE))
-MAVPROXY_UDP_PORT=$((14550 + INSTANCE))
-DDS_UDP_PORT=$((2019 + INSTANCE))
-GAZEBO_JSON_PORT=$((9002 + 10 * INSTANCE))
+# Ports, IDs and the SITL home (LAT_OFFSET/LON_OFFSET/ALT_BASE) come from the
+# swarm's one contract module, mounted read-only at /root/swarm_core (see
+# src/swarm_control/swarm_control/core/config.py for the Gazebo / corners /
+# built-in spacing rules). Assigned first so a failure stops the script.
+INSTANCE_ENV=$(python3 /root/swarm_core/config.py env --instance "${INSTANCE}" \
+    --gazebo "${USE_GAZEBO:-0}" --layout "${SPAWN_LAYOUT:-}" --area "${SPAWN_AREA_M:-120}")
+eval "${INSTANCE_ENV}"
 
 # Create instance directory for parameter isolation
 mkdir -p /sitl/instance_"${INSTANCE}"
@@ -99,7 +64,7 @@ sim_vehicle.py \
     --out 127.0.0.1:${DDS_UDP_PORT} \
     --out 127.0.0.1:${MAVLINK_TCP_PORT} \
     --custom-location="${LAT_OFFSET}","${LON_OFFSET}",${ALT_BASE},${YAW} \
-    --sysid $((INSTANCE+1)) \
+    --sysid ${SYSID_THISMAV} \
     --wipe False \
     --instance "${INSTANCE}" \
     --add-param-file=/sitl/instance_"${INSTANCE}"/instance_dds.parm \

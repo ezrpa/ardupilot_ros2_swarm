@@ -12,7 +12,7 @@ import numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "swarm_control"))
 from swarm_control.perception.camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
-from swarm_control.core import geo  # noqa: E402
+from swarm_control.core import config, geo  # noqa: E402
 
 # udp_port=0 -> no stream is opened; detection methods still usable.
 CP = CameraProcessor(0, 0)
@@ -48,7 +48,7 @@ def test_ignores_weed_free_frame_and_speckle():
 
 
 def test_georeference_nadir():
-    lat, lon, alt = 40.072842, -105.230575, 30.0
+    lat, lon, alt = config.FIELD_ORIGIN_LAT, config.FIELD_ORIGIN_LON, 30.0
     img = _field_frame()
     cv2.circle(img, (320 + 100, 240), 15, MAGENTA_BGR, -1)  # 100 px east of center
     dets = CP._detect_weeds(img, lat=lat, lon=lon, alt=alt)

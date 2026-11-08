@@ -35,8 +35,8 @@ def test_count_area_and_diameter_bounds():
 def test_latlon_offsets():
     # A weed exactly at the field origin (Gazebo 45,50) must map to LAT/LON_BASE.
     lat, lon = gw.gazebo_to_latlon(45.0, 50.0, CENTER[0], CENTER[1])
-    assert abs(lat - 40.072842) < 1e-9
-    assert abs(lon - (-105.230575)) < 1e-9
+    assert abs(lat - gw.config.FIELD_ORIGIN_LAT) < 1e-9
+    assert abs(lon - gw.config.FIELD_ORIGIN_LON) < 1e-9
     # 111.111 m north ≈ +0.001 deg latitude.
     lat2, _ = gw.gazebo_to_latlon(45.0, 50.0 + 111.111, CENTER[0], CENTER[1])
     assert abs((lat2 - lat) - 0.001) < 1e-5

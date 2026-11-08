@@ -26,7 +26,7 @@ import os
 import time
 from collections import deque
 
-from swarm_control.core import geo
+from swarm_control.core import config, geo
 
 NEIGHBOURS = ((1, 0), (0, 1), (-1, 0), (0, -1))   # N, E, S, W in (row, col)
 ALGORITHMS = ("bfs", "dfs")
@@ -204,11 +204,6 @@ class ClaimBoard:
         return out
 
 
-def launch_points(n_drones, size_m, inset_m=8.0):
-    """Separate launch points: the search area's corners, then edge
-    midpoints (north/east metres from the field origin). Must match
-    SPAWN_LAYOUT=corners in start_drone_container.sh."""
-    h = size_m / 2.0 - inset_m
-    pts = [(h, h), (-h, -h), (h, -h), (-h, h),       # NE, SW, NW, SE
-           (0.0, h), (0.0, -h), (h, 0.0), (-h, 0.0)]
-    return [pts[i % len(pts)] for i in range(n_drones)]
+# Separate SAR launch points are part of the deployment contract (the drone
+# container spawns SITL there): owned by core/config.py.
+launch_points = config.launch_points

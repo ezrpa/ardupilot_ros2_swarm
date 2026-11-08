@@ -51,6 +51,7 @@ import os
 import threading
 import time
 
+from swarm_control.core import config
 from swarm_control.tak.cot import TRANSPORTS, make_sender
 from swarm_control.tak.picture import (DEFAULT_GEOID_OFFSET, SinkFanout,
                                        SwarmTakBridge)
@@ -69,7 +70,7 @@ def start_ros_sources(bridge, log=print):
     contexts = []
     for inst in bridge.instances:
         ctx = rclpy.Context()
-        rclpy.init(context=ctx, domain_id=inst + 1)
+        rclpy.init(context=ctx, domain_id=config.ros_domain_id(inst))
         node = rclpy.create_node(f"tak_bridge_{inst}", context=ctx)
 
         def on_pose(msg, i=inst):

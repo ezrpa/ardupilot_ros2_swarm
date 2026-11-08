@@ -31,10 +31,10 @@ import math
 import os
 import time
 
-from swarm_control.core import geo
+from swarm_control.core import config, geo
 
-FIELD_ORIGIN_LAT = 40.072842
-FIELD_ORIGIN_LON = -105.230575
+FIELD_ORIGIN_LAT = config.FIELD_ORIGIN_LAT
+FIELD_ORIGIN_LON = config.FIELD_ORIGIN_LON
 _FIELD = geo.LocalFrame(FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON)
 
 

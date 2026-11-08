@@ -23,10 +23,15 @@ has it, in which case pass --port 5763+10*N for SERIAL2):
     python3 src/scripts/spray_command_test.py --instance 2 --ground-test
 """
 import argparse
+import os
 import sys
 import time
 
 from pymavlink import mavutil
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "swarm_control"))
+from swarm_control.core import config  # noqa: E402
 
 MAV_CMD_DO_SPRAYER = 216
 MAV_CMD_DO_AUX_FUNCTION = 218
@@ -119,7 +124,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--instance', type=int, default=2,
-                    help='drone instance (SERIAL1 port = 5762 + 10*instance)')
+                    help='drone instance (SERIAL1 TCP port from core/config.py)')
     ap.add_argument('--port', type=int,
                     help='override the MAVLink TCP port')
     ap.add_argument('--ground-test', action='store_true',
@@ -129,7 +134,7 @@ def main():
                     help='also exercise the DO_AUX_FUNCTION fallback path')
     args = ap.parse_args()
 
-    port = args.port or (5762 + 10 * args.instance)
+    port = args.port or config.serial1_tcp_port(args.instance)
     print(f"connecting to tcp:127.0.0.1:{port}")
     m = mavutil.mavlink_connection(f'tcp:127.0.0.1:{port}')
     if m.wait_heartbeat(timeout=15) is None:

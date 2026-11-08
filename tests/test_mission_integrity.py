@@ -20,13 +20,13 @@ import numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "swarm_control"))
 from swarm_control.perception.camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
-from swarm_control.core import geo  # noqa: E402
+from swarm_control.core import config, geo  # noqa: E402
 
 CP = CameraProcessor(0, 0)  # udp_port=0 -> no stream, detection still usable
 
 GREEN_BGR = (40, 120, 60)
 MAGENTA_BGR = (255, 0, 255)
-LAT, LON, ALT = 40.072842, -105.230575, 30.0
+LAT, LON, ALT = config.FIELD_ORIGIN_LAT, config.FIELD_ORIGIN_LON, 30.0
 M_PER_DEG_LAT = geo.M_PER_DEG_LAT
 
 

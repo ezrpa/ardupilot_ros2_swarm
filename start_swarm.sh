@@ -32,18 +32,17 @@ sleep 5
 for ((i=0; i<$NUM_DRONES; i++)); do
     echo "Starting drone instance ${i}..."
     
-    # Set environment variables for this instance
-    export INSTANCE=$i
-    export SYSID_THISMAV=$((i+1))
-    export ROS_DOMAIN_ID=$((i+1))
-    export MICRO_ROS_AGENT_PORT=$((2019+i))
+    # Per-instance IDs and ports from the one contract module
+    INSTANCE_ENV=$(python3 "$(dirname "$0")/src/swarm_control/swarm_control/core/config.py" env --instance "$i")
+    eval "${INSTANCE_ENV}"
+    export INSTANCE=$i SYSID_THISMAV ROS_DOMAIN_ID MICRO_ROS_AGENT_PORT
     
     # Start micro-ros-agent for this drone
     docker compose run -d \
         -e INSTANCE=$i \
         -e NUM_DRONES=$NUM_DRONES \
-        -e ROS_DOMAIN_ID=$((i+1)) \
-        -e MICRO_ROS_AGENT_PORT=$((2019+i)) \
+        -e ROS_DOMAIN_ID=$ROS_DOMAIN_ID \
+        -e MICRO_ROS_AGENT_PORT=$MICRO_ROS_AGENT_PORT \
         --name micro-ros-agent-drone-$i \
         micro-ros-agent-drone
     
@@ -62,8 +61,8 @@ for ((i=0; i<$NUM_DRONES; i++)); do
     docker compose run -d \
         -e INSTANCE=$i \
         -e NUM_DRONES=$NUM_DRONES \
-        -e SYSID_THISMAV=$((i+1)) \
-        -e MICRO_ROS_AGENT_PORT=$((2019+i)) \
+        -e SYSID_THISMAV=$SYSID_THISMAV \
+        -e MICRO_ROS_AGENT_PORT=$MICRO_ROS_AGENT_PORT \
         -e USE_GAZEBO=${USE_GAZEBO:-0} \
         -e SPAWN_LAYOUT=${SPAWN_LAYOUT:-} \
         -e DRONE_ROLE=$DRONE_ROLE \

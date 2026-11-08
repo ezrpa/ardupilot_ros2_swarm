@@ -24,11 +24,11 @@ import sys
 # Local metres <-> GPS comes from the shared geo module (ArduPilot/SITL model).
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "..", "swarm_control"))
-from swarm_control.core import geo  # noqa: E402
+from swarm_control.core import config, geo  # noqa: E402
 
 # Must match LAT_BASE/LON_BASE in src/scripts/start_drone_container.sh
-LAT_BASE = 40.072842
-LON_BASE = -105.230575
+LAT_BASE = config.FIELD_ORIGIN_LAT
+LON_BASE = config.FIELD_ORIGIN_LON
 
 SPAWN_XY = (52.5, 50.0)      # centre of the drone spawn cluster
 SPAWN_EXCLUSION_M = 20.0

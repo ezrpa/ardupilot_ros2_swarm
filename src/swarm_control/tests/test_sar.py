@@ -25,6 +25,7 @@ PKG = os.path.dirname(HERE)                       # src/swarm_control
 REPO = os.path.dirname(os.path.dirname(PKG))
 sys.path.insert(0, PKG)                           # the swarm_control package
 
+from swarm_control.core import config  # noqa: E402
 from swarm_control.mission import sar_coordination as sar  # noqa: E402
 
 try:
@@ -34,7 +35,7 @@ try:
 except ImportError:
     _CV = False
 
-LAT0, LON0 = 40.072842, -105.230575
+LAT0, LON0 = config.FIELD_ORIGIN_LAT, config.FIELD_ORIGIN_LON
 
 
 # ------------------------------------------------------------ coordination

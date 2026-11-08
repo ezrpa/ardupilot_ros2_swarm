@@ -20,7 +20,7 @@ import os
 import threading
 import time
 
-from swarm_control.core import geo
+from swarm_control.core import config, geo
 
 try:
     import cv2
@@ -32,7 +32,7 @@ except ImportError:  # pragma: no cover - depends on container image
 # Weed detection: the sim's weeds (model weed_field) are pure magenta blobs,
 # so a tight HSV band + area filter is a reliable detector. Camera intrinsics
 # from base_drone_cam/model.sdf, used for nadir georeferencing.
-CAMERA_HFOV_RAD = 1.2
+CAMERA_HFOV_RAD = config.CAMERA_HFOV_RAD
 WEED_HSV_LOW = (140, 100, 80)
 WEED_HSV_HIGH = (170, 255, 255)
 WEED_MIN_AREA_PX = 50
