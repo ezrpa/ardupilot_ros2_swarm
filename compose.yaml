@@ -43,6 +43,8 @@ services:
       - NUM_DRONES=${NUM_DRONES:-2}
       # Space-separated 0-indexed instances flying the sprayer role
       - SPRAYER_INSTANCES=${SPRAYER_INSTANCES:-}
+      # Mission: "survey" (default) or "sar" (search and rescue)
+      - SWARM_MISSION=${SWARM_MISSION:-survey}
       # TAK / Cursor-on-Target bridge (docs/TAK.md). Empty TAK_URL = off.
       # Cert paths are inside the container: put PEMs in ./tak on the host.
       - TAK_URL=${TAK_URL:-}

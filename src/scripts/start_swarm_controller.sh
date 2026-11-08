@@ -14,10 +14,13 @@ source /ros2_ws/install/setup.bash
 # Archive the previous run's artifacts: the prescription planner counts
 # sidecar frames and the sprayers poll for prescription files — stale ones
 # from an earlier mission would short-circuit both with old data.
-if ls -d /root/logs/drone_* >/dev/null 2>&1 || [ -d /root/logs/prescriptions ]; then
+# Same for SAR: a stale logs/sar/call.json would make every SearchDrone
+# abort its strip and rally on the PREVIOUS run's survivor position.
+if ls -d /root/logs/drone_* >/dev/null 2>&1 || [ -d /root/logs/prescriptions ] \
+        || [ -d /root/logs/sar ]; then
     ARCHIVE="/root/logs/run_$(date +%Y%m%d_%H%M%S)"
     mkdir -p "$ARCHIVE"
-    mv /root/logs/drone_* /root/logs/prescriptions "$ARCHIVE"/ 2>/dev/null || true
+    mv /root/logs/drone_* /root/logs/prescriptions /root/logs/sar "$ARCHIVE"/ 2>/dev/null || true
     echo "Previous mission artifacts archived to $ARCHIVE"
 fi
 
@@ -30,9 +33,17 @@ done
 echo "=== ROS2 Topic Monitor $(date) ==="
 timeout 5 ros2 topic list 2>/dev/null | grep -E "(drone|ap)"
 
-ros2 launch swarm_control compose_decentralized.launch.py \
-    num_drones:="${NUM_DRONES}" \
-    sprayer_instances:="${SPRAYER_INSTANCES:-}" \
-    tak_url:="${TAK_URL:-}"
+# SWARM_MISSION selects the mission: "survey" (default: mapping + optional
+# sprayers) or "sar" (search and rescue, pair with swarm_drone_sar.sdf).
+if [ "${SWARM_MISSION:-survey}" = "sar" ]; then
+    ros2 launch swarm_control sar_mission.launch.py \
+        num_drones:="${NUM_DRONES}" \
+        tak_url:="${TAK_URL:-}"
+else
+    ros2 launch swarm_control compose_decentralized.launch.py \
+        num_drones:="${NUM_DRONES}" \
+        sprayer_instances:="${SPRAYER_INSTANCES:-}" \
+        tak_url:="${TAK_URL:-}"
+fi
 
 
