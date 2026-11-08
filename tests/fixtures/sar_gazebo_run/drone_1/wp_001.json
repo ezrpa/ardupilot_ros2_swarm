@@ -1,0 +1,11 @@
+{
+  "drone_id": 1,
+  "wp_index": 1,
+  "lat": 40.07230758666992,
+  "lon": -105.23126983642578,
+  "alt": 30.02001953125,
+  "heading_deg": 224.17361815386698,
+  "unix_time": 1794129748.3571317,
+  "aruco_detections": [],
+  "person_detections": []
+}

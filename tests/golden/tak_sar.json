@@ -1,0 +1,428 @@
+[
+ {
+  "attrs": {
+   "how": "h-g-i-g-o",
+   "type": "b-r-f-h-c",
+   "uid": "ardupilot-swarm-sar-casualty",
+   "version": "2.0"
+  },
+  "children": [
+   {
+    "attrs": {
+     "ce": "5.0",
+     "hae": "0.00",
+     "lat": "40.07249650",
+     "le": "9999999.0",
+     "lon": "-105.23080264"
+    },
+    "children": [],
+    "tag": "point",
+    "text": ""
+   },
+   {
+    "attrs": {},
+    "children": [
+     {
+      "attrs": {
+       "callsign": "SURVIVOR"
+      },
+      "children": [],
+      "tag": "contact",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "relation": "p-p",
+       "type": "a-f-A-M-F-Q-r",
+       "uid": "ardupilot-swarm-drone-2"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "archive",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "remarks",
+      "text": "Missing person CONFIRMED by SEARCH-3 from 15.0 m AGL (756 px, nadir georef). Image: drone_3/confirm_002.jpg"
+     }
+    ],
+    "tag": "detail",
+    "text": ""
+   }
+  ],
+  "tag": "event",
+  "text": ""
+ },
+ {
+  "attrs": {
+   "how": "h-g-i-g-o",
+   "type": "b-r-f-h-c",
+   "uid": "ardupilot-swarm-sar-casualty",
+   "version": "2.0"
+  },
+  "children": [
+   {
+    "attrs": {
+     "ce": "5.0",
+     "hae": "0.00",
+     "lat": "40.07249650",
+     "le": "9999999.0",
+     "lon": "-105.23080264"
+    },
+    "children": [],
+    "tag": "point",
+    "text": ""
+   },
+   {
+    "attrs": {},
+    "children": [
+     {
+      "attrs": {
+       "callsign": "SURVIVOR"
+      },
+      "children": [],
+      "tag": "contact",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "relation": "p-p",
+       "type": "a-f-A-M-F-Q-r",
+       "uid": "ardupilot-swarm-drone-2"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "archive",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "remarks",
+      "text": "Missing person CONFIRMED by SEARCH-3 from 15.0 m AGL (756 px, nadir georef). Image: drone_3/confirm_002.jpg"
+     }
+    ],
+    "tag": "detail",
+    "text": ""
+   }
+  ],
+  "tag": "event",
+  "text": ""
+ },
+ {
+  "attrs": {
+   "how": "h-g-i-g-o",
+   "type": "b-t-f",
+   "uid": "GeoChat.ardupilot-swarm-drone-2.All Chat Rooms.<uuid>",
+   "version": "2.0"
+  },
+  "children": [
+   {
+    "attrs": {
+     "ce": "9999999.0",
+     "hae": "0.00",
+     "lat": "40.07249650",
+     "le": "9999999.0",
+     "lon": "-105.23080264"
+    },
+    "children": [],
+    "tag": "point",
+    "text": ""
+   },
+   {
+    "attrs": {},
+    "children": [
+     {
+      "attrs": {
+       "chatroom": "All Chat Rooms",
+       "groupOwner": "false",
+       "id": "All Chat Rooms",
+       "messageId": "<uuid>",
+       "parent": "RootContactGroup",
+       "senderCallsign": "SEARCH-3"
+      },
+      "children": [
+       {
+        "attrs": {
+         "id": "All Chat Rooms",
+         "uid0": "ardupilot-swarm-drone-2",
+         "uid1": "All Chat Rooms"
+        },
+        "children": [],
+        "tag": "chatgrp",
+        "text": ""
+       }
+      ],
+      "tag": "__chat",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "relation": "p-p",
+       "type": "a-f-A-M-F-Q-r",
+       "uid": "ardupilot-swarm-drone-2"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "source": "BAO.F.ATAK.ardupilot-swarm-drone-2",
+       "to": "All Chat Rooms"
+      },
+      "children": [],
+      "tag": "remarks",
+      "text": "SURVIVOR FOUND by SEARCH-3 at 40.072497, -105.230803. All search drones converging. CASEVAC point 'SURVIVOR' dropped."
+     }
+    ],
+    "tag": "detail",
+    "text": ""
+   }
+  ],
+  "tag": "event",
+  "text": ""
+ },
+ {
+  "attrs": {
+   "how": "h-e",
+   "type": "u-d-r",
+   "uid": "ardupilot-swarm-field",
+   "version": "2.0"
+  },
+  "children": [
+   {
+    "attrs": {
+     "ce": "9999999.0",
+     "hae": "0.00",
+     "lat": "40.07284200",
+     "le": "9999999.0",
+     "lon": "-105.23057500"
+    },
+    "children": [],
+    "tag": "point",
+    "text": ""
+   },
+   {
+    "attrs": {},
+    "children": [
+     {
+      "attrs": {
+       "callsign": "SEARCH AREA"
+      },
+      "children": [],
+      "tag": "contact",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07338099,-105.23127936"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07338099,-105.22987064"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07230301,-105.22987065"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07230301,-105.23127935"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "-16726016"
+      },
+      "children": [],
+      "tag": "strokeColor",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "3.0"
+      },
+      "children": [],
+      "tag": "strokeWeight",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "671139840"
+      },
+      "children": [],
+      "tag": "fillColor",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "true"
+      },
+      "children": [],
+      "tag": "labels_on",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "archive",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "remarks",
+      "text": "120x120 m search area | PERSON FOUND by SEARCH-3 at 40.072497, -105.230803 | 0/4 drones on scene"
+     }
+    ],
+    "tag": "detail",
+    "text": ""
+   }
+  ],
+  "tag": "event",
+  "text": ""
+ },
+ {
+  "attrs": {
+   "how": "h-e",
+   "type": "u-d-r",
+   "uid": "ardupilot-swarm-field",
+   "version": "2.0"
+  },
+  "children": [
+   {
+    "attrs": {
+     "ce": "9999999.0",
+     "hae": "0.00",
+     "lat": "40.07284200",
+     "le": "9999999.0",
+     "lon": "-105.23057500"
+    },
+    "children": [],
+    "tag": "point",
+    "text": ""
+   },
+   {
+    "attrs": {},
+    "children": [
+     {
+      "attrs": {
+       "callsign": "SEARCH AREA"
+      },
+      "children": [],
+      "tag": "contact",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07338099,-105.23127936"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07338099,-105.22987064"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07230301,-105.22987065"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "point": "40.07230301,-105.23127935"
+      },
+      "children": [],
+      "tag": "link",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "-16726016"
+      },
+      "children": [],
+      "tag": "strokeColor",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "3.0"
+      },
+      "children": [],
+      "tag": "strokeWeight",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "671139840"
+      },
+      "children": [],
+      "tag": "fillColor",
+      "text": ""
+     },
+     {
+      "attrs": {
+       "value": "true"
+      },
+      "children": [],
+      "tag": "labels_on",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "archive",
+      "text": ""
+     },
+     {
+      "attrs": {},
+      "children": [],
+      "tag": "remarks",
+      "text": "120x120 m search area | PERSON FOUND by SEARCH-3 at 40.072497, -105.230803 | 0/4 drones on scene"
+     }
+    ],
+    "tag": "detail",
+    "text": ""
+   }
+  ],
+  "tag": "event",
+  "text": ""
+ }
+]

@@ -1,0 +1,895 @@
+{
+ "plan.geojson": {
+  "features": [
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23052203395257,
+      40.072500577981515
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 385.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23045283727123,
+      40.072559335552164
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 517.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23053120865222,
+      40.07259243838163
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 770.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23060571032242,
+      40.072642705603954
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 742.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23028819060374,
+      40.07254665502152
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 2,
+     "sprayer_instance": 2,
+     "total_area_px": 1263.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23021562383654,
+      40.07255598929425
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 567.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23020134193301,
+      40.07260807041831
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 731.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23102058861566,
+      40.07257369519572
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 2,
+     "total_area_px": 1552.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23053960710186,
+      40.07265226676372
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 739.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23051440199788,
+      40.072717779637706
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 523.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23057356621034,
+      40.07271932271532
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 100.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23039297288464,
+      40.07267871053206
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 353.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.230151058464,
+      40.07266485203218
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 296.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23013593431023,
+      40.07269278228504
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 596.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23099359155952,
+      40.07271803899633
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 903.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23102263662841,
+      40.0726904536669
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 3,
+     "total_area_px": 1435.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23014926307401,
+      40.07273479771043
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 4,
+     "total_area_px": 353.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23013306122658,
+      40.072765502853905
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 4,
+     "total_area_px": 754.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23016023272783,
+      40.072783839764625
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 4,
+     "total_area_px": 288.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23014126632822,
+      40.07281106920754
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 4,
+     "total_area_px": 649.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23028265885598,
+      40.07294265805551
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 2,
+     "sprayer_instance": 4,
+     "total_area_px": 1299.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23038914805497,
+      40.07278831384044
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 4,
+     "total_area_px": 314.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23039514941658,
+      40.072738168062884
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 4,
+     "total_area_px": 387.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.2308086036196,
+      40.0729469182613
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 5,
+     "total_area_px": 455.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23084593161748,
+      40.072948366793156
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 2,
+     "sprayer_instance": 5,
+     "total_area_px": 1545.5
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23083580062931,
+      40.07306440653731
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 5,
+     "total_area_px": 812.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.2309627980797,
+      40.073031490700856
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 5,
+     "total_area_px": 677.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23096222975076,
+      40.0731514258576
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 5,
+     "total_area_px": 931.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23036054660479,
+      40.07302129385254
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 5,
+     "total_area_px": 84.0
+    },
+    "type": "Feature"
+   },
+   {
+    "geometry": {
+     "coordinates": [
+      -105.23028791913553,
+      40.07306598299769
+     ],
+     "type": "Point"
+    },
+    "properties": {
+     "num_detections": 1,
+     "sprayer_instance": 5,
+     "total_area_px": 682.0
+    },
+    "type": "Feature"
+   }
+  ],
+  "type": "FeatureCollection"
+ },
+ "sprayer_2.json": {
+  "clusters": [
+   {
+    "e": 4.512,
+    "lat": 40.07250058,
+    "lon": -105.23052203,
+    "n": -38.007,
+    "num_detections": 1,
+    "total_area_px": 385.5
+   },
+   {
+    "e": 10.406,
+    "lat": 40.07255934,
+    "lon": -105.23045284,
+    "n": -31.466,
+    "num_detections": 1,
+    "total_area_px": 517.0
+   },
+   {
+    "e": 3.73,
+    "lat": 40.07259244,
+    "lon": -105.23053121,
+    "n": -27.781,
+    "num_detections": 1,
+    "total_area_px": 770.5
+   },
+   {
+    "e": -2.616,
+    "lat": 40.07264271,
+    "lon": -105.23060571,
+    "n": -22.185,
+    "num_detections": 1,
+    "total_area_px": 742.0
+   },
+   {
+    "e": 24.432,
+    "lat": 40.07254666,
+    "lon": -105.23028819,
+    "n": -32.877,
+    "num_detections": 2,
+    "total_area_px": 1263.5
+   },
+   {
+    "e": 30.613,
+    "lat": 40.07255599,
+    "lon": -105.23021562,
+    "n": -31.838,
+    "num_detections": 1,
+    "total_area_px": 567.5
+   },
+   {
+    "e": 31.83,
+    "lat": 40.07260807,
+    "lon": -105.23020134,
+    "n": -26.041,
+    "num_detections": 1,
+    "total_area_px": 731.0
+   },
+   {
+    "e": -37.957,
+    "lat": 40.0725737,
+    "lon": -105.23102059,
+    "n": -29.867,
+    "num_detections": 1,
+    "total_area_px": 1552.5
+   }
+  ],
+  "field_origin": [
+   40.072842,
+   -105.230575
+  ],
+  "num_targets": 8,
+  "sprayer_instance": 2,
+  "waypoints": [
+   [
+    -38.01,
+    4.51,
+    15.0
+   ],
+   [
+    -31.47,
+    10.41,
+    15.0
+   ],
+   [
+    -27.78,
+    3.73,
+    15.0
+   ],
+   [
+    -22.19,
+    -2.62,
+    15.0
+   ],
+   [
+    -32.88,
+    24.43,
+    15.0
+   ],
+   [
+    -31.84,
+    30.61,
+    15.0
+   ],
+   [
+    -26.04,
+    31.83,
+    15.0
+   ],
+   [
+    -29.87,
+    -37.96,
+    15.0
+   ]
+  ]
+ },
+ "sprayer_3.json": {
+  "clusters": [
+   {
+    "e": 3.015,
+    "lat": 40.07265227,
+    "lon": -105.23053961,
+    "n": -21.121,
+    "num_detections": 1,
+    "total_area_px": 739.5
+   },
+   {
+    "e": 5.162,
+    "lat": 40.07271778,
+    "lon": -105.2305144,
+    "n": -13.828,
+    "num_detections": 1,
+    "total_area_px": 523.5
+   },
+   {
+    "e": 0.122,
+    "lat": 40.07271932,
+    "lon": -105.23057357,
+    "n": -13.656,
+    "num_detections": 1,
+    "total_area_px": 100.0
+   },
+   {
+    "e": 15.506,
+    "lat": 40.07267871,
+    "lon": -105.23039297,
+    "n": -18.177,
+    "num_detections": 1,
+    "total_area_px": 353.5
+   },
+   {
+    "e": 36.113,
+    "lat": 40.07266485,
+    "lon": -105.23015106,
+    "n": -19.72,
+    "num_detections": 1,
+    "total_area_px": 296.0
+   },
+   {
+    "e": 37.401,
+    "lat": 40.07269278,
+    "lon": -105.23013593,
+    "n": -16.611,
+    "num_detections": 1,
+    "total_area_px": 596.0
+   },
+   {
+    "e": -35.657,
+    "lat": 40.07271804,
+    "lon": -105.23099359,
+    "n": -13.799,
+    "num_detections": 1,
+    "total_area_px": 903.5
+   },
+   {
+    "e": -38.132,
+    "lat": 40.07269045,
+    "lon": -105.23102264,
+    "n": -16.87,
+    "num_detections": 1,
+    "total_area_px": 1435.0
+   }
+  ],
+  "field_origin": [
+   40.072842,
+   -105.230575
+  ],
+  "num_targets": 8,
+  "sprayer_instance": 3,
+  "waypoints": [
+   [
+    -21.12,
+    3.01,
+    15.0
+   ],
+   [
+    -13.83,
+    5.16,
+    15.0
+   ],
+   [
+    -13.66,
+    0.12,
+    15.0
+   ],
+   [
+    -18.18,
+    15.51,
+    15.0
+   ],
+   [
+    -19.72,
+    36.11,
+    15.0
+   ],
+   [
+    -16.61,
+    37.4,
+    15.0
+   ],
+   [
+    -13.8,
+    -35.66,
+    15.0
+   ],
+   [
+    -16.87,
+    -38.13,
+    15.0
+   ]
+  ]
+ },
+ "sprayer_4.json": {
+  "clusters": [
+   {
+    "e": 36.266,
+    "lat": 40.0727348,
+    "lon": -105.23014926,
+    "n": -11.934,
+    "num_detections": 1,
+    "total_area_px": 353.0
+   },
+   {
+    "e": 37.646,
+    "lat": 40.0727655,
+    "lon": -105.23013306,
+    "n": -8.516,
+    "num_detections": 1,
+    "total_area_px": 754.5
+   },
+   {
+    "e": 35.332,
+    "lat": 40.07278384,
+    "lon": -105.23016023,
+    "n": -6.474,
+    "num_detections": 1,
+    "total_area_px": 288.5
+   },
+   {
+    "e": 36.947,
+    "lat": 40.07281107,
+    "lon": -105.23014127,
+    "n": -3.443,
+    "num_detections": 1,
+    "total_area_px": 649.0
+   },
+   {
+    "e": 24.903,
+    "lat": 40.07294266,
+    "lon": -105.23028266,
+    "n": 11.205,
+    "num_detections": 2,
+    "total_area_px": 1299.0
+   },
+   {
+    "e": 15.832,
+    "lat": 40.07278831,
+    "lon": -105.23038915,
+    "n": -5.976,
+    "num_detections": 1,
+    "total_area_px": 314.0
+   },
+   {
+    "e": 15.32,
+    "lat": 40.07273817,
+    "lon": -105.23039515,
+    "n": -11.558,
+    "num_detections": 1,
+    "total_area_px": 387.5
+   }
+  ],
+  "field_origin": [
+   40.072842,
+   -105.230575
+  ],
+  "num_targets": 7,
+  "sprayer_instance": 4,
+  "waypoints": [
+   [
+    -11.93,
+    36.27,
+    15.0
+   ],
+   [
+    -8.52,
+    37.65,
+    15.0
+   ],
+   [
+    -6.47,
+    35.33,
+    15.0
+   ],
+   [
+    -3.44,
+    36.95,
+    15.0
+   ],
+   [
+    11.21,
+    24.9,
+    15.0
+   ],
+   [
+    -5.98,
+    15.83,
+    15.0
+   ],
+   [
+    -11.56,
+    15.32,
+    15.0
+   ]
+  ]
+ },
+ "sprayer_5.json": {
+  "clusters": [
+   {
+    "e": -19.899,
+    "lat": 40.07294692,
+    "lon": -105.2308086,
+    "n": 11.679,
+    "num_detections": 1,
+    "total_area_px": 455.0
+   },
+   {
+    "e": -23.079,
+    "lat": 40.07294837,
+    "lon": -105.23084593,
+    "n": 11.841,
+    "num_detections": 2,
+    "total_area_px": 1545.5
+   },
+   {
+    "e": -22.216,
+    "lat": 40.07306441,
+    "lon": -105.2308358,
+    "n": 24.758,
+    "num_detections": 1,
+    "total_area_px": 812.0
+   },
+   {
+    "e": -33.034,
+    "lat": 40.07303149,
+    "lon": -105.2309628,
+    "n": 21.094,
+    "num_detections": 1,
+    "total_area_px": 677.0
+   },
+   {
+    "e": -32.986,
+    "lat": 40.07315143,
+    "lon": -105.23096223,
+    "n": 34.445,
+    "num_detections": 1,
+    "total_area_px": 931.0
+   },
+   {
+    "e": 18.268,
+    "lat": 40.07302129,
+    "lon": -105.23036055,
+    "n": 19.959,
+    "num_detections": 1,
+    "total_area_px": 84.0
+   },
+   {
+    "e": 24.455,
+    "lat": 40.07306598,
+    "lon": -105.23028792,
+    "n": 24.934,
+    "num_detections": 1,
+    "total_area_px": 682.0
+   }
+  ],
+  "field_origin": [
+   40.072842,
+   -105.230575
+  ],
+  "num_targets": 7,
+  "sprayer_instance": 5,
+  "waypoints": [
+   [
+    11.68,
+    -19.9,
+    15.0
+   ],
+   [
+    11.84,
+    -23.08,
+    15.0
+   ],
+   [
+    24.76,
+    -22.22,
+    15.0
+   ],
+   [
+    21.09,
+    -33.03,
+    15.0
+   ],
+   [
+    34.44,
+    -32.99,
+    15.0
+   ],
+   [
+    19.96,
+    18.27,
+    15.0
+   ],
+   [
+    24.93,
+    24.45,
+    15.0
+   ]
+  ]
+ }
+}

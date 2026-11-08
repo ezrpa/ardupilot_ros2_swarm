@@ -1,0 +1,14 @@
+{
+  "found_by_instance": 2,
+  "found_by_id": 3,
+  "lat": 40.072496500301924,
+  "lon": -105.2308026449362,
+  "confirm_alt": 15.0,
+  "unix_time": 1794129769.0190103,
+  "first_sighting": [
+    40.07249681712681,
+    -105.23080292605616
+  ],
+  "area_px": 755.5,
+  "image": "drone_3/confirm_002.jpg"
+}
