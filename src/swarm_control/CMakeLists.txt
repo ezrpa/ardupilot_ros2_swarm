@@ -5,37 +5,18 @@ project(swarm_control)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_core REQUIRED)
 find_package(ament_cmake_python REQUIRED)
-find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
-find_package(std_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(mavros_msgs REQUIRED)
-find_package(fastcdr REQUIRED)
-
-# Specify additional locations of header files
-include_directories(
-  ${rclcpp_INCLUDE_DIRS}
-  ${std_msgs_INCLUDE_DIRS}
-  ${geometry_msgs_INCLUDE_DIRS}
-  ${mavros_msgs_INCLUDE_DIRS}
-  ${fastcdr_INCLUDE_DIRS}
-)
 
 # Python packages
 ament_python_install_package(scripts)
-ament_python_install_package(utility)
 
 # Install Python scripts (exclude __pycache__ directories)
 file(GLOB SCRIPT_FILES_SCRIPTS
   "scripts/*.py"
 )
-file(GLOB SCRIPT_FILES_UTILITY
-  "utility/*.py"
-)
 
 install(PROGRAMS
   ${SCRIPT_FILES_SCRIPTS}
-  ${SCRIPT_FILES_UTILITY}
   DESTINATION lib/${PROJECT_NAME}
 )
 

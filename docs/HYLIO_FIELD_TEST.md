@@ -2,7 +2,7 @@
 
 Status: **plan, blocked on unbuilt software and unanswered vendor questions.**
 
-This is the deployment target described in `README_MAVLINK_BRIDGE.md`. That
+This is the deployment target described in `MAVLINK_BRIDGE.md`. That
 document specifies the *simulation* of this path; this one covers taking it to a
 real aircraft. Read that file first — everything here assumes its design.
 
@@ -10,7 +10,7 @@ real aircraft. Read that file first — everything here assumes its design.
 
 ## 1. Why a Hylio is not like the test quads
 
-`README_HARDWARE_TESTING.md` covers the two custom quads, where you control the
+`HARDWARE_TESTING.md` covers the two custom quads, where you control the
 whole stack: swap the flight controller, flash a custom ArduPilot build with
 AP_DDS compiled in, and run the repo unchanged.
 
@@ -43,7 +43,7 @@ Hylio drone (ArduPilot fw) ── RFD900x serial radio ── companion ── L
 `mavlink_bridge.py` is **specified but not implemented**. Until it exists,
 `base_drone_dds.py` cannot talk to a Hylio at all — it speaks only to the `/ap/*`
 DDS surface. Build and verify it in SITL first, following
-`README_MAVLINK_BRIDGE.md` Phases 1–3, and pass its Phase 5 A/B verification
+`MAVLINK_BRIDGE.md` Phases 1–3, and pass its Phase 5 A/B verification
 (DDS sprayers as control group vs. MAVLink sprayers) before any real hardware is
 involved.
 
@@ -97,7 +97,7 @@ answered first.
 The RFD900x default is **57600 baud** — roughly 5.7 kB/s raw, less after air-rate
 and duty-cycle overhead, and **shared across every aircraft on the channel**.
 
-`README_MAVLINK_BRIDGE.md` Phase 1 requests `GLOBAL_POSITION_INT`,
+`MAVLINK_BRIDGE.md` Phase 1 requests `GLOBAL_POSITION_INT`,
 `LOCAL_POSITION_NED` and `EXTENDED_SYS_STATE` at 10 Hz. At ~40 bytes per
 message that is ~1.2 kB/s per aircraft before heartbeats, acks, and whatever
 AgroSol is already streaming. Workable for one aircraft; it will not scale to a
@@ -130,7 +130,7 @@ documents this twice, and it is doubly true here because an ACCEPTED
 
 ### Rung 0 — SITL
 
-`README_MAVLINK_BRIDGE.md` Phase 5, in full. Bridge-controlled sprayers must
+`MAVLINK_BRIDGE.md` Phase 5, in full. Bridge-controlled sprayers must
 match DDS-controlled sprayers on track accuracy and prescription execution.
 
 ### Rung 1 — Bench, aircraft powered, **props removed, tank empty**
@@ -215,11 +215,11 @@ aircraft, and if so, disable it before Rung 4.
 
 ## 6. Recommended order of work
 
-1. Implement and verify `mavlink_bridge.py` in SITL (`README_MAVLINK_BRIDGE.md`
+1. Implement and verify `mavlink_bridge.py` in SITL (`MAVLINK_BRIDGE.md`
    Phases 1–5). No hardware, no risk, and it is the long pole.
 2. In parallel, send Hylio the five vendor questions and start the regulatory
    conversation.
-3. In parallel, run the custom quads through `README_HARDWARE_TESTING.md`. They
+3. In parallel, run the custom quads through `HARDWARE_TESTING.md`. They
    are the cheap place to learn how this stack behaves on a real airframe with
    real GPS, real EKF warm-up, and real wind — all lessons that transfer, at a
    fraction of the consequence.
