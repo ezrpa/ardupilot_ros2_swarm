@@ -5,7 +5,10 @@ set -e
 LAT_BASE=40.072842
 LON_BASE=-105.230575
 ALT_BASE=1586
-YAW=0
+# Spawn heading in degrees. Overridable so a vehicle can be started facing a
+# known direction to validate heading-dependent code (e.g. the body-frame ->
+# north/east rotation in camera_processor.py).
+YAW=${YAW:-0}
 
 # Environment variables from Docker Compose
 # When scaling with docker compose, INSTANCE should be passed as an env var

@@ -118,14 +118,35 @@ The sprayer is an extension at every layer, mirroring the camera:
   (`SPRAY_ENABLE=1`, pump = SERVO9/function 22 with speed-proportional flow,
   spinner = SERVO10/23, RC9_OPTION=15). Sized to a DJI Agras T25.
 - Node: `sprayer_drone_dds.py` → `SprayerDrone(BaseDrone)` toggles the sprayer
-  via MAV_CMD_DO_AUX_FUNCTION over SERIAL1 TCP (`5762+10i`, free since GCS uses
-  UDP) around its mission. The launch file is role-aware (`sprayer_instances`
-  arg from `SPRAYER_INSTANCES` env via compose): mappers split the field among
-  themselves at 30 m with cameras; sprayers split it among themselves at 15 m.
+  over SERIAL1 TCP (`5762+10i`, free since GCS uses UDP) around its mission,
+  using **MAV_CMD_DO_SPRAYER (216)** — param1 1=enable/0=disable, the command
+  ArduPilot routes to `AC_Sprayer::run()`. Sent as COMMAND_LONG (firmware
+  converts to COMMAND_INT before dispatch) and gated on a COMMAND_ACK matched
+  to command 216; on a non-ACCEPTED result or no ack it falls back to
+  MAV_CMD_DO_AUX_FUNCTION (218, aux function 15), which reaches the same
+  `run()` via RC_Channel. DO_SPRAYER is also a valid AUTO mission item
+  (`AP_Mission::start_command_do_sprayer`) — unused, we fly GUIDED.
+  An ACCEPTED ack proves only that the firmware has a sprayer object: it is
+  returned whenever `AP::sprayer()` is non-null, **whatever SPRAY_ENABLE is**.
+  Verify with pump PWM, not the ack. The launch file is role-aware
+  (`sprayer_instances` arg from `SPRAYER_INSTANCES` env via compose): mappers
+  split the field among themselves at 30 m with cameras; sprayers split it
+  among themselves at 15 m.
 - Visuals: host-side `src/scripts/spray_visualizer.py` polls each sprayer's
   pump servo on SERIAL2 TCP (`5763+10i`) and mirrors it to the plume topics, so
   the plume reflects real firmware behaviour (off below SPRAY_SPEED_MIN, on
   while sweeping). Verified: pump PWMs 1433-1547 while spraying at 5 m/s.
+
+Ground-test the sprayer commands without flying (SITL instance must be up):
+```bash
+python3 src/scripts/spray_command_test.py --instance 2 --ground-test --aux
+```
+It sends both commands, matches the acks, and reads SERVO9 PWM back from
+SERVO_OUTPUT_RAW. `--ground-test` temporarily zeroes SPRAY_SPEED_MIN and
+raises SPRAY_PUMP_MIN (restored afterwards) because AC_Sprayer will not pump
+below SPRAY_SPEED_MIN — a parked vehicle stays at idle PWM no matter what you
+command. Expected on a parked drone: idle/off 1100 (= SERVO9_MIN), on 1300
+(= SERVO9_MIN + 25% of range).
 
 ### Prescription Plan Pipeline (targeted spraying)
 Runs automatically with the mixed fleet: mappers survey and detect weeds →

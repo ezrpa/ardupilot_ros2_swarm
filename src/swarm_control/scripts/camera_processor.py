@@ -52,11 +52,18 @@ PERSON_DETECTORS = {"person": (PERSON_HSV_LOW, PERSON_HSV_HIGH,
 
 
 def detect_color_blobs(frame, hsv_low, hsv_high, min_area_px,
-                       lat=None, lon=None, alt=None):
+                       lat=None, lon=None, alt=None, heading=None):
     """Find blobs inside an HSV band; returns [{'centroid_px', 'bbox',
     'area_px', 'lat', 'lon'}]. lat/lon are georeferenced from the drone pose
-    assuming a north-aligned nadir camera (approximate - vehicle yaw is not
-    compensated), or None when the pose is unknown. Never raises."""
+    with a nadir camera model, or None when the pose is unknown. Never raises.
+
+    The camera is body-fixed (base_drone_cam mounts it at pitch 90 with no
+    yaw offset), so image-right is the vehicle's right and image-up is its
+    nose. Pixel offsets are therefore BODY-frame and must be rotated by the
+    compass heading (radians) to become north/east; skipping that rotation put
+    detections up to a full 2x their nadir offset away, since ArduPilot yaws
+    toward each waypoint and reverses heading on alternating serpentine legs.
+    heading=None falls back to the old north-aligned assumption."""
     if not _CV2_OK:
         return []
     try:
@@ -86,8 +93,11 @@ def detect_color_blobs(frame, hsv_low, hsv_high, min_area_px,
                 "lon": None,
             }
             if lat is not None and lon is not None and alt is not None:
-                east = (cx - w / 2.0) / f_px * alt
-                north = -(cy - h / 2.0) / f_px * alt
+                right = (cx - w / 2.0) / f_px * alt
+                forward = -(cy - h / 2.0) / f_px * alt
+                psi = 0.0 if heading is None else heading
+                north = forward * math.cos(psi) - right * math.sin(psi)
+                east = forward * math.sin(psi) + right * math.cos(psi)
                 det["lat"] = lat + north / 111111.0
                 det["lon"] = lon + east / (
                     111111.0 * math.cos(math.radians(lat)))
@@ -178,10 +188,11 @@ class CameraProcessor:
 
     # --------------------------------------------------------------- capture
     def capture(self, wp_index, lat=None, lon=None, alt=None, extra=None,
-                prefix="wp"):
+                prefix="wp", heading=None):
         """Save the freshest frame as <prefix>_<n>.jpg with a JSON geotag
         sidecar (ArUco + one "<name>_detections" list per configured
-        detector). Returns the image path, or None if no frame was available;
+        detector). heading (radians) rotates body-frame pixel offsets to
+        north/east. Returns the image path, or None if no frame was available;
         the sidecar dict is also kept in self.last_meta.
         """
         self.last_meta = None
@@ -196,7 +207,8 @@ class CameraProcessor:
 
         detections = self._detect_aruco(frame)
         found = {name: detect_color_blobs(frame, lo, hi, min_area,
-                                          lat=lat, lon=lon, alt=alt)
+                                          lat=lat, lon=lon, alt=alt,
+                                          heading=heading)
                  for name, (lo, hi, min_area) in self.detectors.items()}
 
         stem = f"{prefix}_{wp_index:03d}"
@@ -209,6 +221,10 @@ class CameraProcessor:
             "lat": lat,
             "lon": lon,
             "alt": alt,
+            # Recorded so a run can be audited after the fact: heading is what
+            # turns body-frame pixel offsets into north/east.
+            "heading_deg": (None if heading is None
+                            else math.degrees(heading) % 360.0),
             "unix_time": time.time(),
             "aruco_detections": detections,
         }
@@ -245,16 +261,18 @@ class CameraProcessor:
             for i, c in zip(ids, corners)
         ]
 
-    def _detect_weeds(self, frame, lat=None, lon=None, alt=None):
+    def _detect_weeds(self, frame, lat=None, lon=None, alt=None, heading=None):
         """Detect magenta weed blobs (see detect_color_blobs)."""
         return detect_color_blobs(frame, WEED_HSV_LOW, WEED_HSV_HIGH,
-                                  WEED_MIN_AREA_PX, lat=lat, lon=lon, alt=alt)
+                                  WEED_MIN_AREA_PX, lat=lat, lon=lon, alt=alt,
+                                  heading=heading)
 
-    def _detect_person(self, frame, lat=None, lon=None, alt=None):
+    def _detect_person(self, frame, lat=None, lon=None, alt=None,
+                       heading=None):
         """Detect the hi-vis orange missing person (see detect_color_blobs)."""
         return detect_color_blobs(frame, PERSON_HSV_LOW, PERSON_HSV_HIGH,
                                   PERSON_MIN_AREA_PX, lat=lat, lon=lon,
-                                  alt=alt)
+                                  alt=alt, heading=heading)
 
     # ---------------------------------------------------------------- close
     def close(self):

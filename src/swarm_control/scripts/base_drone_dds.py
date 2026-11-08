@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import math
 
 import rclpy
 import time
@@ -16,6 +17,19 @@ from points_distributor import generate_circular_waypoints
 from scripts.drone_state import DroneState, FlightMode
 
 from scripts.time_out_retry import TimeoutRetry
+
+
+# A vehicle below this height above home is treated as not flying, whatever
+# the mission loop thinks it is doing.
+MIN_FLIGHT_ALT_M = 2.0
+
+# Metres per degree of latitude; longitude is scaled by cos(lat) at use.
+M_PER_DEG_LAT = 111320.0
+
+TAKEOFF_ALT_M = 50.0
+TAKEOFF_ALT_FRACTION = 0.9   # "climb finished" threshold, fraction of target
+TAKEOFF_TIMEOUT_S = 90.0
+GUIDED_SWITCH_ATTEMPTS = 3
 
 
 def mode_success_check_factory(mode: FlightMode):
@@ -69,6 +83,9 @@ class BaseDrone(Node):
         self.home_alt = None
         self.transformer = None
         self.current_position = None
+        # Measured global pose from /ap/geopose/filtered: the only trustworthy
+        # answer to "where is this vehicle". Commanded waypoints are not.
+        self.current_geopose = None
         self.target_position = None
         self.armed = False
 
@@ -88,12 +105,25 @@ class BaseDrone(Node):
         # back to the per-drone GPS origin.
         self.declare_parameter('field_origin_lat', 0.0)
         self.declare_parameter('field_origin_lon', 0.0)
+        # Waypoint arrival is confirmed by measured position, not by a timer.
+        self.declare_parameter('arrival_radius', 3.0)
+        self.declare_parameter('waypoint_timeout', 60.0)
+        # Short settle after arrival so the airframe damps out before the
+        # camera grabs a frame; 2 s is ~20 frames at the model's 10 Hz.
+        self.declare_parameter('arrival_settle', 2.0)
         # Then get parameter values
         self.drone_id = self.get_parameter('drone_id').get_parameter_value().integer_value
         self._arm_topic = self.get_parameter("arm_topic").get_parameter_value().string_value
         self._mode_topic = self.get_parameter("mode_topic").get_parameter_value().string_value
         self._global_pos_topic = self.get_parameter("global_position_topic").get_parameter_value().string_value
         self._pose_topic = self.get_parameter("pose_topic").get_parameter_value().string_value
+
+        self.arrival_radius = self.get_parameter(
+            'arrival_radius').get_parameter_value().double_value
+        self.waypoint_timeout = self.get_parameter(
+            'waypoint_timeout').get_parameter_value().double_value
+        self.arrival_settle = self.get_parameter(
+            'arrival_settle').get_parameter_value().double_value
 
         field_lat = self.get_parameter('field_origin_lat').get_parameter_value().double_value
         field_lon = self.get_parameter('field_origin_lon').get_parameter_value().double_value
@@ -126,6 +156,16 @@ class BaseDrone(Node):
             GeoPointStamped,
             '/ap/gps_global_origin/filtered',
             self.gps_origin_callback,
+            ardupilot_qos
+        )
+        # Measured lat/lon/alt + attitude. /ap/pose/filtered is local ENU
+        # relative to the EKF origin, which is NOT the shared field origin the
+        # waypoint transformer is built on, so it cannot be compared against
+        # waypoints directly. geopose is already global.
+        self.geopose_subscription = self.create_subscription(
+            GeoPoseStamped,
+            '/ap/geopose/filtered',
+            self._geopose_callback_impl,
             ardupilot_qos
         )
 
@@ -161,6 +201,64 @@ class BaseDrone(Node):
             msg.pose.position.y,
             msg.pose.position.z
         )
+
+    def _geopose_callback_impl(self, msg):
+        """Measured global pose: true lat/lon/alt plus vehicle heading.
+
+        AP_DDS publishes this orientation in ENU/REP-103 (x forward, y left,
+        z up), so the quaternion yaw is measured counter-clockwise from EAST;
+        convert to a compass heading (clockwise from north) for georeferencing.
+        """
+        q = msg.pose.orientation
+        yaw_enu = math.atan2(2.0 * (q.w * q.z + q.x * q.y),
+                             1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+        self.current_geopose = {
+            'lat': msg.pose.position.latitude,
+            'lon': msg.pose.position.longitude,
+            'alt_amsl': msg.pose.position.altitude,
+            'heading': (math.pi / 2.0 - yaw_enu) % (2.0 * math.pi),
+        }
+
+    def rel_alt(self):
+        """Height above home in metres, or None if not yet known."""
+        if self.current_geopose is None or self.home_alt is None:
+            return None
+        return self.current_geopose['alt_amsl'] - self.home_alt
+
+    def is_airborne(self):
+        """True only when the vehicle is armed AND actually off the ground.
+
+        The mission loop must never advance on a vehicle that has landed,
+        disarmed, or crashed: every capture taken in that state gets geotagged
+        with a waypoint the aircraft never visited.
+        """
+        alt = self.rel_alt()
+        return bool(self.armed) and alt is not None and alt > MIN_FLIGHT_ALT_M
+
+    def distance_to(self, lat, lon):
+        """Ground distance in metres from the measured position, or None."""
+        gp = self.current_geopose
+        if gp is None:
+            return None
+        m_per_deg_lon = M_PER_DEG_LAT * math.cos(math.radians(gp['lat']))
+        return math.hypot((gp['lat'] - lat) * M_PER_DEG_LAT,
+                          (gp['lon'] - lon) * m_per_deg_lon)
+
+    def wait_until_arrived(self, lat, lon, timeout):
+        """Spin until the vehicle actually reaches (lat, lon).
+
+        Returns 'arrived', 'timeout', or 'not_flying'. Replaces a blind
+        time.sleep() that could not distinguish flying from parked.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.2)
+            if not self.is_airborne():
+                return 'not_flying'
+            distance = self.distance_to(lat, lon)
+            if distance is not None and distance <= self.arrival_radius:
+                return 'arrived'
+        return 'timeout'
 
     def arm_response_callback(self, future):
         """Handle arm service response"""
@@ -247,9 +345,12 @@ class BaseDrone(Node):
         return lat, lon
 
     def on_waypoint_reached(self, wp_index, lat, lon, alt):
-        """Extension hook, called after the dwell at each waypoint.
-        No-op in the base drone; subclasses (e.g. CameraDrone in
-        camera_drone_dds.py) override it to add per-waypoint behaviour."""
+        """Extension hook, called once the vehicle has actually arrived.
+
+        lat/lon are the MEASURED position and alt the measured height above
+        home — not the commanded waypoint. Anything that georeferences from
+        these values (CameraDrone in camera_drone_dds.py) therefore records
+        where the aircraft really was. No-op in the base drone."""
         pass
 
     def prepare_mission(self):
@@ -272,15 +373,45 @@ class BaseDrone(Node):
 
         self.state = DroneState.FLYING
 
-        # Simple waypoint following
+        # Closed-loop waypoint following. Arrival is confirmed against the
+        # MEASURED position and the mission aborts the moment the vehicle stops
+        # flying — an earlier open-loop version advanced on a fixed 10 s timer,
+        # so a node that respawned onto a landed aircraft happily "reached"
+        # every waypoint and geotagged 32 of 33 weed detections from a drone
+        # parked on the ground.
         for i, wp in enumerate(self.waypoints):
             lat, lon = self.xy_to_latlon(wp[0], wp[1])
             self.send_position_command_dds(lat, lon, wp[2])
             rclpy.spin_once(self)
-            self.get_logger().info(f"Drone {self.drone_id} heading to waypoint {i + 1}: {lat, lon, wp[2]}")
-            time.sleep(10)  # Wait between waypoints
-            # Arrived (open-loop dwell): extension hook for subclasses.
-            self.on_waypoint_reached(i + 1, lat, lon, wp[2])
+            self.get_logger().info(
+                f"Drone {self.drone_id} heading to waypoint {i + 1}: "
+                f"{lat, lon, wp[2]}")
+
+            outcome = self.wait_until_arrived(lat, lon, self.waypoint_timeout)
+            if outcome == 'not_flying':
+                self.state = DroneState.ERROR
+                self.get_logger().error(
+                    f"Drone {self.drone_id} is no longer airborne at waypoint "
+                    f"{i + 1} (armed={self.armed}, rel_alt={self.rel_alt()}); "
+                    "aborting mission rather than logging captures the "
+                    "aircraft never actually made")
+                return
+            if outcome == 'timeout':
+                self.get_logger().warning(
+                    f"Drone {self.drone_id} did not reach waypoint {i + 1} "
+                    f"within {self.waypoint_timeout:.0f}s "
+                    f"({self.distance_to(lat, lon):.1f} m short); capturing "
+                    "at the measured position and moving on")
+            else:
+                # Arrived: let the airframe settle before the capture.
+                settle_until = time.time() + self.arrival_settle
+                while time.time() < settle_until:
+                    rclpy.spin_once(self, timeout_sec=0.1)
+
+            # Hand the subclass hook the MEASURED pose, never the command.
+            gp = self.current_geopose
+            self.on_waypoint_reached(i + 1, gp['lat'], gp['lon'],
+                                     self.rel_alt())
 
         self.get_logger().info("Mission complete, returning to launch")
         self.state = DroneState.RETURNING
@@ -340,16 +471,51 @@ def main(args=None, node_class=BaseDrone):
     if not node.wait_for_position_estimate():
         raise RuntimeError("No position estimate available")
 
-    if not node.switch_mode(FlightMode.GUIDED):
+    # The GUIDED switch races EKF readiness and ArduPilot rejects it until the
+    # filter settles. Letting the TimeoutError kill the node is worse than
+    # waiting: launch respawns it onto an already-flying aircraft, and the new
+    # process re-runs this whole sequence mid-air. Retry in-process instead.
+    for attempt in range(1, GUIDED_SWITCH_ATTEMPTS + 1):
+        try:
+            if node.switch_mode(FlightMode.GUIDED):
+                break
+        except TimeoutError:
+            pass
+        node.get_logger().warning(
+            f"GUIDED switch attempt {attempt}/{GUIDED_SWITCH_ATTEMPTS} "
+            "failed; retrying")
+    else:
         raise RuntimeError("Unable to switch to GUIDED mode")
 
     # Takeoff
-    takeoff_result = node.takeoff(50.0)
+    takeoff_result = node.takeoff(TAKEOFF_ALT_M)
     if not takeoff_result.status:
         raise RuntimeError("Takeoff failed")
     node.get_logger().info(f"Drone take off status: {takeoff_result.status}")
-    # Wait for takeoff completion
-    time.sleep(15)
+
+    # Wait for the climb to actually happen instead of guessing at 15 s.
+    # is_airborne() is the liveness test (a couple of metres clears it), which
+    # is far too low to start transiting to a waypoint - hold until the vehicle
+    # is nearly at the commanded takeoff altitude.
+    climb_target = TAKEOFF_ALT_M * TAKEOFF_ALT_FRACTION
+    climb_deadline = time.time() + TAKEOFF_TIMEOUT_S
+    while time.time() < climb_deadline:
+        rclpy.spin_once(node, timeout_sec=0.2)
+        alt = node.rel_alt()
+        if alt is not None and alt >= climb_target:
+            break
+    if not node.is_airborne():
+        raise RuntimeError(
+            f"Takeoff acknowledged but the vehicle never left the ground "
+            f"(rel_alt={node.rel_alt()}) - refusing to fly a mission that "
+            "would log captures from a grounded aircraft")
+    if node.rel_alt() < climb_target:
+        node.get_logger().warning(
+            f"Drone {node.drone_id} only reached {node.rel_alt():.1f} m of the "
+            f"{climb_target:.1f} m climb target in {TAKEOFF_TIMEOUT_S:.0f}s; "
+            "continuing since it is airborne")
+    node.get_logger().info(
+        f"Drone {node.drone_id} airborne at {node.rel_alt():.1f} m")
 
     node.get_logger().info(f"Drone {node.drone_id} initialized with DDS")
     node.get_logger().info(f"Drone {node.drone_id} started mission")

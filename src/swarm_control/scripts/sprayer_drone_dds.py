@@ -7,14 +7,15 @@ flow, RC aux function 15 as the on/off switch).
 
 The drone flies its assigned strip like any BaseDrone; this subclass simply
 turns the REAL firmware sprayer on for the duration of the mission and off
-afterwards, via MAV_CMD_DO_AUX_FUNCTION over the drone's SERIAL1 MAVLink TCP
-port (5762 + 10*instance — free, since ground stations use the UDP outputs).
+afterwards, via MAV_CMD_DO_SPRAYER over the drone's SERIAL1 MAVLink TCP port
+(5762 + 10*instance — free, since ground stations use the UDP outputs).
 While flying, AC_Sprayer drives the pump proportionally to ground speed and
 stops below SPRAY_SPEED_MIN; the host-side spray_visualizer.py mirrors the
 pump servo output onto the Gazebo particle-emitter plumes.
 
 MAVLink failures are non-fatal: without the side channel the drone still
-flies its mission, just without spraying.
+flies its mission, just without spraying. Nothing in here may raise into
+start_mission().
 """
 import json
 import os
@@ -29,10 +30,29 @@ except ImportError:  # pragma: no cover
     mavutil = None
     _MAV_OK = False
 
-# MAV_CMD_DO_AUX_FUNCTION (218): param1 = aux function, param2 = switch pos
+# ArduPilot's sprayer commands, as implemented in firmware:
+#
+# MAV_CMD_DO_SPRAYER (216, ardupilotmega dialect) — the dedicated command.
+#   param1: 1 = enable, 0 = disable; params 2-7 unused. Firmware path is
+#   GCS_MAVLINK::handle_command_do_sprayer() -> AC_Sprayer::run(bool).
+#   Sent as COMMAND_LONG: ArduPilot converts every COMMAND_LONG to a
+#   COMMAND_INT (try_command_long_as_command_int) before dispatch, and
+#   DO_SPRAYER stores no location, so the conversion is lossless.
+#   The same command is also a valid AUTO mission item
+#   (AP_Mission::start_command_do_sprayer, cmd.p1 == 1) — unused here, we
+#   fly GUIDED and command the sprayer directly.
+#
+# MAV_CMD_DO_AUX_FUNCTION (218) — generic aux-switch command; aux function 15
+#   is the sprayer (hence RC9_OPTION 15 in sprayer.parm). Reaches the same
+#   AC_Sprayer::run() through RC_Channel, and is the fallback for firmware
+#   built without the DO_SPRAYER handler (HAL_SPRAYER_ENABLED off).
+MAV_CMD_DO_SPRAYER = 216
 MAV_CMD_DO_AUX_FUNCTION = 218
+SPRAYER_ENABLE, SPRAYER_DISABLE = 1, 0
 AUX_FUNC_SPRAYER = 15
 AUX_POS_LOW, AUX_POS_HIGH = 0, 2
+MAV_RESULT_ACCEPTED = 0
+ACK_TIMEOUT = 3.0
 
 
 class SprayerDrone(BaseDrone):
@@ -102,17 +122,66 @@ class SprayerDrone(BaseDrone):
                     self._mav = False
         return self._mav or None
 
+    def _command(self, m, command, *params):
+        """Send a COMMAND_LONG and return the MAV_RESULT for THAT command.
+
+        Returns None if no matching ack arrives within ACK_TIMEOUT. The link
+        has been idle since wait_heartbeat(), so the buffer may hold acks for
+        other commands — match on ack.command and keep reading until the
+        deadline rather than trusting the first ack off the wire.
+        """
+        args = list(params) + [0.0] * (7 - len(params))
+        m.mav.command_long_send(
+            m.target_system, m.target_component, command, 0, *args)
+        deadline = time.time() + ACK_TIMEOUT
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            ack = m.recv_match(type='COMMAND_ACK', blocking=True,
+                               timeout=remaining)
+            if ack is not None and ack.command == command:
+                return ack.result
+
     def set_spray(self, on):
-        """Flip ArduPilot's sprayer aux switch (AC_Sprayer on/off)."""
+        """Turn ArduPilot's AC_Sprayer on or off.
+
+        Tries MAV_CMD_DO_SPRAYER first and falls back to the RC aux-function
+        command if the firmware rejects it or stays silent.
+
+        An ACCEPTED ack only proves the firmware has a sprayer object — it is
+        returned whenever AP::sprayer() is non-null, whatever SPRAY_ENABLE is
+        set to. Proof that liquid moves is pump servo PWM on SERVO9; watch it
+        with spray_visualizer.py, or with
+        `src/scripts/spray_command_test.py --instance N`.
+        """
         m = self._mavlink()
         if m is None:
-            return
-        m.mav.command_long_send(
-            m.target_system, m.target_component,
-            MAV_CMD_DO_AUX_FUNCTION, 0,
-            AUX_FUNC_SPRAYER, AUX_POS_HIGH if on else AUX_POS_LOW,
-            0, 0, 0, 0, 0)
-        self.get_logger().info(f"[sprayer] spray {'ON' if on else 'OFF'}")
+            return False
+        want = 'ON' if on else 'OFF'
+        try:
+            result = self._command(
+                m, MAV_CMD_DO_SPRAYER,
+                SPRAYER_ENABLE if on else SPRAYER_DISABLE)
+            if result != MAV_RESULT_ACCEPTED:
+                self.get_logger().warning(
+                    f"[sprayer] DO_SPRAYER {want} returned {result} - "
+                    "falling back to aux function 15")
+                result = self._command(
+                    m, MAV_CMD_DO_AUX_FUNCTION, AUX_FUNC_SPRAYER,
+                    AUX_POS_HIGH if on else AUX_POS_LOW)
+        except Exception as e:
+            # Side channel died mid-mission: log and fly on, dry.
+            self.get_logger().warning(f"[sprayer] spray {want} failed: {e}")
+            self._mav = False
+            return False
+        if result == MAV_RESULT_ACCEPTED:
+            self.get_logger().info(f"[sprayer] spray {want}")
+            return True
+        self.get_logger().error(
+            f"[sprayer] spray {want} rejected (result={result}) - "
+            "flying without spray")
+        return False
 
     def start_mission(self):
         self.set_spray(True)

@@ -27,6 +27,11 @@ SPRAY_SPINNER 1300
 SERVO9_FUNCTION 22
 SERVO10_FUNCTION 23
 
-# RC9 toggles the sprayer (aux function 15: <1200 off, >1800 on). The control
-# node turns spraying on/off by overriding RC9 via MAVLink or DO_AUX_FUNCTION.
+# RC9 toggles the sprayer (aux function 15: <1200 off, >1800 on).
+# The control node normally uses MAV_CMD_DO_SPRAYER (216) instead, which hits
+# AC_Sprayer::run() directly; this option stays for manual RC control and for
+# the node's MAV_CMD_DO_AUX_FUNCTION (218) fallback path.
+# Caveat: the aux handler does run(ch_flag == HIGH), so any RC9 position change
+# clobbers a DO_SPRAYER enable. If the pump goes quiet while commands still ack
+# ACCEPTED, suspect RC9 before suspecting the command.
 RC9_OPTION 15

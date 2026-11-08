@@ -212,7 +212,8 @@ class FakeCamera:
         self.person, self.gps, self.last_meta = person, gps, None
         self.captures = 0
 
-    def capture(self, idx, lat=None, lon=None, alt=None, prefix="wp"):
+    def capture(self, idx, lat=None, lon=None, alt=None, prefix="wp",
+                heading=None):
         self.captures += 1
         dlat, dlon, _ = self.gps()          # where the drone REALLY is
         dn = (self.person[0] - dlat) * sar.M_PER_DEG_LAT

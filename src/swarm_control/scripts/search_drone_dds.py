@@ -88,6 +88,11 @@ class SearchDrone(BaseDrone):
     def _log(self, msg):
         self.get_logger().info(f"[sar] {msg}")
 
+    def _heading(self):
+        """Current compass heading (rad) for body-frame georeferencing."""
+        gp = getattr(self, 'current_geopose', None)
+        return None if gp is None else gp.get('heading')
+
     def _status(self, state, **fields):
         if self.gps:
             fields.setdefault('lat', self.gps[0])
@@ -144,7 +149,8 @@ class SearchDrone(BaseDrone):
             if call:
                 break
 
-            self.camera.capture(i + 1, lat=lat, lon=lon, alt=alt)
+            self.camera.capture(i + 1, lat=lat, lon=lon, alt=alt,
+                                heading=self._heading())
             meta = self.camera.last_meta or {}
             det = sar.best_detection(meta.get('person_detections'))
             if det is None:
@@ -191,7 +197,8 @@ class SearchDrone(BaseDrone):
             return call
 
         self.camera.capture(wp_index, lat=det['lat'], lon=det['lon'],
-                            alt=self.confirm_alt, prefix="confirm")
+                            alt=self.confirm_alt, prefix="confirm",
+                            heading=self._heading())
         meta = self.camera.last_meta or {}
         confirmed = sar.match_detection(meta.get('person_detections'),
                                         det['lat'], det['lon'],

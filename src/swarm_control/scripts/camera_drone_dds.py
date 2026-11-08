@@ -28,8 +28,15 @@ class CameraDrone(BaseDrone):
             self.drone_id, self.camera_port, logger=self.get_logger())
 
     def on_waypoint_reached(self, wp_index, lat, lon, alt):
-        """Capture a geotagged mapping frame after arriving at a waypoint."""
-        self.camera.capture(wp_index, lat=lat, lon=lon, alt=alt)
+        """Capture a geotagged mapping frame after arriving at a waypoint.
+
+        lat/lon/alt come from the measured pose, and heading comes with them —
+        the camera is body-fixed, so georeferencing needs it to resolve pixel
+        offsets into north/east.
+        """
+        gp = self.current_geopose
+        self.camera.capture(wp_index, lat=lat, lon=lon, alt=alt,
+                            heading=None if gp is None else gp['heading'])
 
     def destroy_node(self):
         self.camera.close()
