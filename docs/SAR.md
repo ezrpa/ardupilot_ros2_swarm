@@ -32,9 +32,9 @@ SWARM_MISSION=sar TAK_URL="udp://239.2.3.1:6969" USE_GAZEBO=1 ./start_swarm.sh 4
 |---|---|
 | Missing person (life-size, hi-vis orange coverall, seeded random spot/heading) | `src/custom_gz/worlds/generate_missing_person.py` → `models/missing_person/` (+ `ground_truth.json`) |
 | World (swarm_drone.sdf with the person instead of weeds) | `src/custom_gz/worlds/swarm_drone_sar.sdf` |
-| Person detector (HSV band H 0–14, high saturation; no overlap with the farm palette or magenta weeds) | `camera_processor.py` `PERSON_*`, `detect_color_blobs()` |
-| Drone node | `search_drone_dds.py` → `SearchDrone(BaseDrone)` |
-| Call channel + rally geometry (ROS-free) | `sar_coordination.py` |
+| Person detector (HSV band H 0–14, high saturation; no overlap with the farm palette or magenta weeds) | `perception/camera_processor.py` `PERSON_*`, `detect_color_blobs()`, `detect_person()` |
+| Drone node | `nodes/search_drone.py` (executable `search_drone_dds.py`) → `SearchDrone(BaseDrone)` |
+| Call channel + rally geometry (ROS-free) | `mission/sar_coordination.py` |
 | Launch | `launch/sar_mission.launch.py` |
 | Tests (incl. 4-drone end-to-end mission with ROS stubbed) | `tests/test_sar.py` |
 

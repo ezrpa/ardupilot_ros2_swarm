@@ -51,11 +51,11 @@ vehicle, which then fails arming with "Throttle too high". Keep it disabled.
 
 ### Camera Mapping Pipeline (OpenCV)
 Each drone flies a balanced 1/n serpentine strip of the field
-(`split_serpentine` in `points_distributor.py` — exactly n contiguous chunks,
+(`split_serpentine` in `mission/points_distributor.py` — exactly n contiguous chunks,
 sizes differ by ≤1, nothing dropped; the old `split_by_grid` was unbalanced and
 silently dropped waypoints for non-square drone counts). All drones share one
-field origin (`field_origin_lat/lon` params, set in the launch file — must match
-`LAT_BASE/LON_BASE` in `start_drone_container.sh`) so the strips tile a single
+field origin (`field_origin_lat/lon` params, set by the launch file from
+`core/config.py`, the same origin SITL homes use) so the strips tile a single
 field instead of shifting with each drone's home.
 
 The camera is an **extension**, at both layers:
@@ -66,7 +66,7 @@ The camera is an **extension**, at both layers:
   camera-less. GstCameraPlugin only streams after a Boolean(true) on its
   `.../image/enable_streaming` gz topic — `start_gazebo.sh` does this
   automatically.
-- Nodes: `camera_drone_dds.py` defines `CameraDrone(BaseDrone)` which overrides
+- Nodes: `nodes/camera_drone.py` (executable `camera_drone_dds.py`) defines `CameraDrone(BaseDrone)` which overrides
   the `on_waypoint_reached` hook to capture a geotagged frame (+ ArUco
   detection) per waypoint into `/root/logs/drone_<id>/` (host: `./logs`).
   `BaseDrone` stays camera-free; camera failures never break the mission.
@@ -77,7 +77,7 @@ Simulated weeds: `src/custom_gz/worlds/generate_weeds.py` generates
 `models/weed_field` — oversized magenta visual-only blobs over the surveyed
 80×80 m area (seeded; ground truth lat/lon in
 `models/weed_field/ground_truth.json`), included by both swarm worlds.
-`camera_processor.py` detects them per waypoint via an HSV band
+`perception/camera_processor.py` detects them per waypoint via an HSV band
 (H 140–170) + contour area filter and georeferences each detection
 (nadir approximation, yaw not compensated); results land in the sidecar
 JSON as `weed_detections`. Regenerate the layout with
@@ -117,7 +117,7 @@ The sprayer is an extension at every layer, mirroring the camera:
   the container appends `sprayer.parm`: ArduPilot's REAL `AC_Sprayer`
   (`SPRAY_ENABLE=1`, pump = SERVO9/function 22 with speed-proportional flow,
   spinner = SERVO10/23, RC9_OPTION=15). Sized to a DJI Agras T25.
-- Node: `sprayer_drone_dds.py` → `SprayerDrone(BaseDrone)` toggles the sprayer
+- Node: `nodes/sprayer_drone.py` (executable `sprayer_drone_dds.py`) → `SprayerDrone(BaseDrone)` toggles the sprayer
   over SERIAL1 TCP (`5762+10i`, free since GCS uses UDP) around its mission,
   using **MAV_CMD_DO_SPRAYER (216)** — param1 1=enable/0=disable, the command
   ArduPilot routes to `AC_Sprayer::run()`. Sent as COMMAND_LONG (firmware
@@ -150,7 +150,7 @@ command. Expected on a parked drone: idle/off 1100 (= SERVO9_MIN), on 1300
 
 ### Prescription Plan Pipeline (targeted spraying)
 Runs automatically with the mixed fleet: mappers survey and detect weeds →
-`prescription_planner.py` (launched by the launch file inside swarm_controller)
+`mission/prescription_planner.py` (launched by the launch file inside swarm_controller)
 waits for the survey, clusters the georeferenced detections
 (`--cluster-radius`), splits balanced NN-ordered shares among sprayers, and
 writes `logs/prescriptions/sprayer_<i>.json` (+ `plan.geojson` for GIS) —
@@ -182,14 +182,14 @@ TAK_URL="tls://tak:8089" TAK_CERT=/root/tak/c.pem TAK_KEY=/root/tak/c.key \
   TAK_CA=/root/tak/ca.pem ./start_swarm.sh 4                 # TAK Server mTLS
 python3 tests/test_tak_bridge.py          # no ROS needed
 ```
-`tak_bridge.py` (launched in swarm_controller only when `TAK_URL` is set;
+`nodes/tak_bridge.py` (picture logic in `tak/picture.py`; launched in swarm_controller only when `TAK_URL` is set;
 `tak_url` launch arg) is read-only: it opens its OWN DDS participant per drone
 domain (one `rclpy.Context(domain_id=i+1)` each) on `/ap/geopose/filtered`,
 `/ap/status`, `/ap/battery`, `/ap/gps_global_origin/filtered` — not MAVLink,
 because QGC owns UDP 14550+i and the sprayer node / spray visualizer own
 SERIAL1/2 TCP. It also watches `logs/drone_*/wp_*.json` (live weed markers)
 and `logs/prescriptions/sprayer_*.json` (targets replace detections via
-`t-x-d-d` deletes). `tak_cot.py` encoders are stdlib; PyTAK is optional (below). CoT `hae` is
+`t-x-d-d` deletes). `tak/cot.py` encoders are stdlib; PyTAK is optional (below). CoT `hae` is
 ellipsoidal: AMSL + `TAK_GEOID_OFFSET` (default −17 m at the field origin).
 Certs go in `./tak` (gitignored, mounted at `/root/tak`). AFSIM pairing
 (DIS gateway, LVC split) is a design only — see `docs/TAK.md`.
@@ -201,17 +201,17 @@ Certs go in `./tak` (gitignored, mounted at `/root/tak`). AFSIM pairing
 python3 tests/test_tak_sim.py
 ```
 SITL built-in physics replace Gazebo physics. `SIM_SENSORS=synthetic` makes the
-drone nodes' `make_camera()` (`synthetic_camera.py`) render nadir frames from the
+drone nodes' `make_camera()` (`perception/synthetic_camera.py`) render nadir frames from the
 worlds' ground-truth JSON (mounted at `/root/sim_models`). Those frames go
 through the unchanged HSV detectors and georeferencing. `CameraProcessor` gets
 each frame from `_grab_frame()`, which the synthetic camera overrides. CoT goes
 out via PyTAK: `pytak==7.6.1` in Dockerfile.ros2, and `TAK_TRANSPORT`
 auto|pytak|stdlib selects `PytakSender` or `CotSender` (file:// always uses
-`CotSender`). `tak_viewer.py` is a read-only PyTAK receiver serving a Leaflet
+`CotSender`). `tak/viewer.py` (executable `tak_viewer.py`) is a read-only PyTAK receiver serving a Leaflet
 map (`src/swarm_control/viewer/index.html`).
 
 SAR defaults in the TAK sim: `SPAWN_LAYOUT=corners` (separate launch points),
-`SAR_SEARCH=bfs` (or `dfs`/`strips`; `sar_search.py`, cells claimed via O_EXCL
+`SAR_SEARCH=bfs` (or `dfs`/`strips`; `mission/sar_search.py`, cells claimed via O_EXCL
 files in logs/sar/claims), `SIM_SCENARIO=sar_scenario` (casualty plus orange
 decoys) and `SIM_REALISM=1`. Person detection is `detect_person`: HSV
 candidates, then a metric shape score with frame-edge rejection. Browser e2e:
@@ -277,22 +277,45 @@ ros2 launch swarm_control compose_decentralized.launch.py num_drones:=4
 
 ### Core Communication Flow
 ```
-ArduPilot SITL ←→ DDS/Micro-ROS Agent ←→ ROS2 Nodes (base_drone_dds.py)
+ArduPilot SITL ←→ DDS/Micro-ROS Agent ←→ ROS2 Nodes (swarm_control.nodes)
      ↓
-MAVLink TCP (port 5760 + 10*ID for GCS connection)
+MAVLink TCP (config.mavlink_tcp_port: 5760 + 10*instance, for GCS)
 ```
 
+### Code Layout
+The ROS package `src/swarm_control` holds one Python package, `swarm_control`,
+layered (enforced by `.importlinter`; only `nodes` may import ROS, `core` is
+stdlib-only):
+
+| Layer | Modules |
+|---|---|
+| `core/` | `config.py` (THE deployment contract: field origin, per-instance ports / ROS domain / sysid, camera intrinsics, SAR spawn layout), `geo.py` (THE local-metres <-> GPS model, copied from ArduPilot's `Location::offset` so it matches SITL), `drone_state.py` |
+| `mission/` | `points_distributor`, `prescription_planner`, `sar_coordination`, `sar_search` |
+| `perception/` | `camera_processor`, `synthetic_camera` |
+| `tak/` | `cot` (CoT encoding, senders), `picture` (`SwarmTakBridge`, `SinkFanout`), `viewer` |
+| `nodes/` | `base_drone`, `camera_drone`, `sprayer_drone`, `search_drone`, `tak_bridge`, `time_out_retry` |
+
+`src/swarm_control/scripts/*.py` are thin entry points only; they keep the
+installed executable names (`base_drone_dds.py`, `camera_drone_dds.py`,
+`sprayer_drone_dds.py`, `search_drone_dds.py`, `prescription_planner.py`,
+`tak_bridge.py`, `tak_viewer.py`) so launch files, compose and
+`ros2 run swarm_control <name>.py` are unchanged. Host tools import the package
+by adding `src/swarm_control` to `sys.path`. Diagnostics live in
+`tools/diagnostics/`.
+
+Never hard-code the field origin, a port formula or the camera intrinsics:
+import `swarm_control.core.config` (Python) or
+`eval "$(python3 .../core/config.py env --instance N)"` (shell; the ArduPilot
+container mounts `core/` read-only at `/root/swarm_core`). Never convert
+metres <-> GPS by hand: use `swarm_control.core.geo`. `tests/test_contracts.py`
+fails on either, and checks the Gazebo model SDFs (FDM ports, camera fov/size/
+stream port) against `config`.
+
 ### Key Components
-
-1. **BaseDrone** (`src/swarm_control/scripts/base_drone_dds.py`): Main drone control node
-   - Handles state management, navigation, and mission execution
-   - Communicates via DDS with ArduPilot
-   - Implements autonomous takeoff, waypoint following, and landing
-
-2. **Swarm Controller** (`src/swarm_control/scripts/points_distributor.py`): Waypoint distribution
-   - Generates grid or circular patterns for multiple drones
-   - Coordinates mission timing across swarm
-
+1. **BaseDrone** (`nodes/base_drone.py`): arm, takeoff, GPS-arrival-gated
+   waypoints, RTL; extension hooks `prepare_mission` / `on_waypoint_reached`.
+2. **Waypoints** (`mission/points_distributor.py`): grid/circular patterns and
+   the balanced 1/n serpentine split.
 3. **Docker Services**:
    - `discovery_server`: FastRTPS discovery for ROS2 networking
    - `swarm_controller`: ROS2 control nodes and launch files
@@ -300,30 +323,36 @@ MAVLink TCP (port 5760 + 10*ID for GCS connection)
    - `micro-ros-agent-drone-{ID}`: DDS communication bridges
 
 ### Port Allocation
-Authoritative source is `src/scripts/start_drone_container.sh` (`INSTANCE` is 0-indexed):
-- MAVLink TCP (GCS/QGC):   `5760 + 10*INSTANCE`  (drone 0 = 5760, drone 1 = 5770)
-- SITL:                    `5501 + 10*INSTANCE`
-- MAVProxy UDP out:        `14550 + INSTANCE`
-- Micro-ROS Agent / DDS:   `2019 + INSTANCE`
-- Gazebo JSON:             `9002 + 10*INSTANCE`
-- ROS_DOMAIN_ID:           `INSTANCE + 1`  (domain isolation per drone)
-- SYSID_THISMAV:           `INSTANCE + 1`
+Authoritative source is `core/config.py` (`instance` is 0-indexed):
+- MAVLink TCP (GCS/QGC):   `5760 + 10*instance`  (drone 0 = 5760, drone 1 = 5770)
+- SERIAL1 / SERIAL2 TCP:   `5762 / 5763 + 10*instance` (sprayer node / spray visualizer)
+- SITL:                    `5501 + 10*instance`
+- MAVProxy UDP out:        `14550 + instance`
+- Micro-ROS Agent / DDS:   `2019 + instance`
+- Gazebo JSON:             `9002 + 10*instance`
+- Camera RTP stream:       `5600 + instance`
+- ROS_DOMAIN_ID:           `instance + 1`  (domain isolation per drone)
+- SYSID_THISMAV:           `instance + 1`
 
-`check_swarm_status.sh N` checks real health: a MAVLink HEARTBEAT on UDP `14550+i`
-(reports BUSY if QGroundControl holds the port) and `ros2 node list` in each drone's
-domain `i+1`.
+`check_swarm_status.sh N` checks real health: a MAVLink HEARTBEAT on each MAVProxy
+UDP port (reports BUSY if QGroundControl holds the port) and `ros2 node list` in each
+drone's domain.
 
 ## Critical Implementation Details
 
 ### GPS and Coordinate Systems
-- GPS origin simulation: Base lat/lon defined in parameters
-- Each drone gets offset position based on ID (5m spacing)
-- Coordinate transformations handled by `pyproj` and `geopy`
+- One field origin (`config.FIELD_ORIGIN_LAT/LON`). Gazebo mode: every SITL home
+  is the origin and SITL reports GPS = home + world position. Built-in physics:
+  homes ~5 m apart. `SPAWN_LAYOUT=corners`: the SAR launch points.
+- All metres <-> GPS conversion goes through `core/geo.py`: ArduPilot's
+  equirectangular model (111318.845 m/deg, longitude scaled at mid-latitude),
+  so commanded waypoints, detections, planner output and ground truth agree
+  with SITL. (Earlier code mixed 111111 m/deg, 111320 m/deg and a pyproj
+  transverse Mercator.)
 - Home position must be set before arming
 
 ### State Management
-The `DroneState` enum lives in `src/swarm_control/scripts/drone_state.py` (imported by
-`base_drone_dds.py`). The full set of states:
+The `DroneState` enum lives in `core/drone_state.py`. The full set of states:
 - Connection: `INITIALIZING` → `CONNECTING` → `CONNECTED`
 - Pre-flight: `DISARMED` → `ARMING` → `ARMED`
 - Operation: `TAKING_OFF` → `FLYING` → `RETURNING` → `LANDING` → `LANDED`
@@ -340,19 +369,37 @@ changes and mission progress.
   `FlightMode` are plain Python enums, not ROS2 interface messages.
 
 ### Domain Isolation
-Each drone operates in its own ROS2 domain (`drone_id + 1`) to prevent cross-talk between
-instances.
+Each drone operates in its own ROS2 domain (`config.ros_domain_id(instance)`) to
+prevent cross-talk between instances.
+
+## Tests and Checks
+```bash
+python3 -m pytest                    # host: unit, contracts, golden masters
+python3 -m pytest tests/e2e --sim    # + Playwright TAK viewer check (live swarm)
+docker run --rm -v "$PWD":/repo:ro --entrypoint bash \
+  ardupilot_ros2_swarm-swarm_controller /repo/tools/ci/container_checks.sh
+ruff check . && PYTHONPATH=src/swarm_control lint-imports
+(cd src/swarm_control && mypy --config-file ../../mypy.ini -p swarm_control.core)
+```
+- Markers: `ros` (needs rclpy; auto-skipped off the controller image), `sim`.
+- `tests/test_golden.py` pins behaviour on recorded runs in `tests/fixtures/`
+  (planner, georeferencing, person detection, SAR geometry, waypoints, TAK
+  CoT). A diff means behaviour changed; regenerate (`--regen`) only for an
+  intended change and say so in the commit.
+- `tools/ci/container_checks.sh` builds with colcon, diffs the install tree
+  against `tests/golden/install_layout.txt`, smokes every executable, and runs
+  the ROS tests. CI (`.github/workflows/ci.yml`) runs both halves.
 
 ## Common Development Tasks
 
 ### Adding New Drone Behaviors
-Modify `src/swarm_control/scripts/base_drone_dds.py`:
-- Add new states to the state machine
-- Implement behavior in the main control loop
-- Update state transition logic
+Subclass `BaseDrone` in a new `nodes/<name>.py` and override its hooks
+(`prepare_mission`, `on_waypoint_reached`) as `CameraDrone` / `SprayerDrone` /
+`SearchDrone` do; add a `main()` and a wrapper in `scripts/` for a new executable.
+Keep ROS out of everything below `nodes/`.
 
 ### Modifying Waypoint Patterns
-Edit `src/swarm_control/scripts/points_distributor.py`:
+Edit `mission/points_distributor.py`:
 - Implement new pattern generation functions
 - Update the waypoint distribution logic
 
@@ -369,19 +416,18 @@ FastDDS transport config is separate, in `src/dockerfiles/config/fastdds_profile
 Key environment variables passed by `start_swarm.sh` / `compose.yaml` to each instance:
 - `INSTANCE`: 0-indexed drone identifier (drives all per-drone port/ID math)
 - `NUM_DRONES`: total swarm size
-- `SYSID_THISMAV`: MAVLink system ID (`INSTANCE + 1`)
-- `ROS_DOMAIN_ID`: ROS2 domain for network isolation (`INSTANCE + 1`)
-- `MICRO_ROS_AGENT_PORT`: DDS agent UDP port (`2019 + INSTANCE`)
+- `SYSID_THISMAV`, `ROS_DOMAIN_ID`, `MICRO_ROS_AGENT_PORT`: from `core/config.py`
+- `USE_GAZEBO`, `SPAWN_LAYOUT`, `SPAWN_AREA_M`, `DRONE_ROLE`: physics / spawn / role
 - `RMW_IMPLEMENTATION`: DDS middleware (`rmw_fastrtps_cpp`)
 
-Port values like SITL/MAVLink/Gazebo are **computed inside `start_drone_container.sh`**
-from `INSTANCE`, not passed as environment variables.
+The remaining ports and the SITL home are computed inside the drone container by
+`config.py env` from `INSTANCE`, not passed as environment variables.
 
 ## Dependencies and Requirements
 
 - Host system: Ubuntu 22.04+ with Docker and Docker Compose
 - Gazebo simulation (runs on host, not in containers)
-- Python packages: pymavlink, dronekit, numpy, pyproj, geopy
+- Python packages: numpy, opencv (GStreamer build in the controller image), pymavlink (host tools), pytak (optional TAK transport)
 - ROS2 Humble with FastRTPS or CycloneDDS
 
 ## Debugging Tips

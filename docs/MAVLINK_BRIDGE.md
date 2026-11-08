@@ -56,7 +56,7 @@ per-drone via `MAVLINK_INSTANCES` (must be a subset of `SPRAYER_INSTANCES`).
 - `CMakeLists.txt` installs `scripts/*.py` via GLOB — a new executable script needs
   no build-config change.
 
-## Phase 1 — `src/swarm_control/scripts/mavlink_bridge.py` (new)
+## Phase 1 — `src/swarm_control/swarm_control/nodes/mavlink_bridge.py` (new)
 
 `MavlinkBridge(Node)`; params: `instance` (int), `mavlink_tcp_port` (default 0 →
 `5762+10*instance`), `stream_rate_hz` (10.0).
@@ -185,8 +185,8 @@ python3 src/scripts/spray_visualizer.py --instances 2 3 4 5 &
 
 ## Files to be touched
 
-- NEW `src/swarm_control/scripts/mavlink_bridge.py`
-- `src/swarm_control/scripts/sprayer_drone_dds.py`
+- NEW `src/swarm_control/swarm_control/nodes/mavlink_bridge.py` (+ entry-point wrapper `scripts/mavlink_bridge.py`)
+- `src/swarm_control/swarm_control/nodes/sprayer_drone.py`
 - `src/swarm_control/launch/compose_decentralized.launch.py`
 - `compose.yaml`, `src/scripts/start_swarm_controller.sh`, `start_swarm.sh`
 - `src/scripts/start_drone_container.sh`

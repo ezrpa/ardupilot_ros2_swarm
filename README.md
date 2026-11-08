@@ -85,22 +85,27 @@ video port).
 
 | Path | Purpose |
 |---|---|
-| `src/swarm_control/scripts/base_drone_dds.py` | Base flight node (DDS state machine, waypoint mission, extension hook) |
-| `src/swarm_control/scripts/camera_drone_dds.py` | `CameraDrone` extension: per-waypoint geotagged capture |
-| `src/swarm_control/scripts/camera_processor.py` | GStreamer→OpenCV capture, ArUco detection, geotag sidecars |
-| `src/swarm_control/scripts/points_distributor.py` | Waypoint generation + balanced serpentine 1/n split |
+| `src/swarm_control/swarm_control/core/config.py` | THE deployment contract: field origin, per-instance ports / ROS domain / sysid, camera intrinsics, spawn layout (Python + `config.py env` for shell) |
+| `src/swarm_control/swarm_control/core/geo.py` | THE local-metres ↔ GPS model (ArduPilot's, matches SITL) |
+| `src/swarm_control/swarm_control/nodes/base_drone.py` | Base flight node (DDS state machine, waypoint mission, extension hooks) |
+| `src/swarm_control/swarm_control/nodes/camera_drone.py` | `CameraDrone` extension: per-waypoint geotagged capture |
+| `src/swarm_control/swarm_control/perception/camera_processor.py` | GStreamer→OpenCV capture, ArUco + colour/shape detection, geotag sidecars |
+| `src/swarm_control/swarm_control/mission/points_distributor.py` | Waypoint generation + balanced serpentine 1/n split |
+| `src/swarm_control/scripts/*.py` | Thin entry points keeping the executable names (`base_drone_dds.py`, ...) |
 | `src/swarm_control/launch/compose_decentralized.launch.py` | Per-drone node launch, field origin + camera ports |
 | `src/custom_gz/models/base_drone*` | Plain drone models (per-instance FDM port) |
 | `src/custom_gz/models/base_drone_cam*` | Camera extension wrappers |
 | `src/custom_gz/worlds/swarm_drone.sdf` | Farm world with 4 camera drones |
 | `src/scripts/stitch_field_map.py` | Position-based field mosaic from geotagged frames |
-| `src/swarm_control/scripts/tak_bridge.py` / `tak_cot.py` | TAK bridge (DDS + mission logs → CoT) and stdlib CoT encoder/transports |
+| `src/swarm_control/swarm_control/nodes/tak_bridge.py` / `tak/picture.py` / `tak/cot.py` | TAK bridge node (DDS → picture), ROS-free CoT picture, CoT encoder/transports |
 | `tests/test_points_distributor.py` | Splitter balance/coverage tests |
 | `tests/test_tak_bridge.py` | CoT schema, bridge pipeline, UDP/file sender tests |
-| `src/swarm_control/scripts/search_drone_dds.py` / `sar_coordination.py` | SAR drone node; call channel + rally geometry |
+| `src/swarm_control/swarm_control/nodes/search_drone.py` / `mission/sar_coordination.py` | SAR drone node; call channel + rally geometry |
 | `src/swarm_control/launch/sar_mission.launch.py` | SAR mission launch (`SWARM_MISSION=sar`) |
 | `src/custom_gz/worlds/swarm_drone_sar.sdf` / `generate_missing_person.py` | SAR world and missing-person generator |
 | `tests/test_sar.py` | SAR tests incl. a 4-drone end-to-end mission with ROS stubbed |
+| `tests/test_golden.py`, `tests/test_contracts.py` | Golden masters on recorded runs; contract checks (config owns every shared constant) |
+| `.importlinter`, `tools/ci/container_checks.sh`, `.github/workflows/ci.yml` | Layering contracts; colcon + ROS checks in the image; CI |
 
 ## Roadmap (toward the STTR architecture)
 
