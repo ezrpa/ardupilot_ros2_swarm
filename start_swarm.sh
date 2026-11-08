@@ -60,6 +60,7 @@ for ((i=0; i<$NUM_DRONES; i++)); do
         -e SYSID_THISMAV=$((i+1)) \
         -e MICRO_ROS_AGENT_PORT=$((2019+i)) \
         -e USE_GAZEBO=${USE_GAZEBO:-0} \
+        -e SPAWN_LAYOUT=${SPAWN_LAYOUT:-} \
         -e DRONE_ROLE=$DRONE_ROLE \
         --name drone-ardu-$i \
         drone_ardu

@@ -233,8 +233,12 @@ class FakeCamera:
         pass
 
 
-def _make_drone(SearchDrone, inst, swarm, wps, logs, person):
+def _make_drone(SearchDrone, inst, swarm, wps, logs, person, algo="strips",
+                start=None):
+    import sar_search
     d = SearchDrone.__new__(SearchDrone)       # skip ROS-bound __init__
+    d.search_algo, d.logs_dir = algo, logs
+    d.grid = sar_search.Grid(LAT0, LON0, 120.0, 7)
     d.drone_id, d.instance, d.swarm = inst + 1, inst, swarm
     d.waypoints = wps
     d.transformer = object()
@@ -248,7 +252,7 @@ def _make_drone(SearchDrone, inst, swarm, wps, logs, person):
     d.poll_s, d.converge_poll_s = 0.005, 0.01
     d.home_lat = d.home_lon = d.home_alt = None
     d.bus = sar.SarBus(logs)
-    d.gps = (LAT0, LON0, 1586.0)
+    d.gps = (start or (LAT0, LON0)) + (1586.0,)
     d.track = []
     d.mode = None
 
@@ -352,6 +356,51 @@ def test_not_found_everyone_completes_and_rtls():
         for st in b.sar_status.values():
             st["state"] = "search_complete"
         assert "NOT found" in b._sar_field_status()
+
+
+def test_grid_search_from_separate_launch_points():
+    """BFS and DFS: drones start at different corners, claim cells, never
+    search one twice, and still find + confirm + rally on the person."""
+    _stub_ros()
+    from search_drone_dds import SearchDrone
+    import sar_search
+    gt = json.load(open(os.path.join(REPO, "src", "custom_gz", "models",
+                                     "missing_person", "ground_truth.json")))
+    person = (gt["person"]["lat"], gt["person"]["lon"])
+    far = sar.offset_latlon(LAT0, LON0, 500.0, 500.0)
+    swarm = [0, 1, 2, 3]
+    starts = [sar.offset_latlon(LAT0, LON0, n, e)
+              for n, e in sar_search.launch_points(4, 120.0)]
+    for algo in sar_search.ALGORITHMS:
+        for target, found in ((person, True), (far, False)):
+            with tempfile.TemporaryDirectory() as logs:
+                drones = [_make_drone(SearchDrone, i, swarm, [], logs, target,
+                                      algo=algo, start=starts[i])
+                          for i in swarm]
+                ts = [threading.Thread(target=d.start_mission) for d in drones]
+                [t.start() for t in ts]
+                [t.join(timeout=30) for t in ts]
+                assert not any(t.is_alive() for t in ts), "mission hung"
+                claims = sar_search.ClaimBoard(logs, drones[0].grid).all_claims()
+                cells = [(c["row"], c["col"]) for c in claims]
+                assert len(cells) == len(set(cells)), "cell searched twice"
+                # each drone's first cell is the one under its launch point
+                for i, d in enumerate(drones):
+                    first = d.track[0]
+                    assert d.grid.cell_at(first[0], first[1]) == \
+                        d.grid.cell_at(*starts[i]), (algo, i)
+                call_path = os.path.join(logs, "sar", "call.json")
+                if found:
+                    call = json.load(open(call_path))
+                    assert sar.distance_m(person[0], person[1], call["lat"],
+                                          call["lon"]) < 1.0
+                    assert len(cells) < 49        # search stopped early
+                else:
+                    assert not os.path.exists(call_path)
+                    assert len(cells) == 49       # whole grid covered once
+                    by = [sum(c["instance"] == i for c in claims)
+                          for i in swarm]
+                    assert max(by) - min(by) <= 3, by   # work is shared
 
 
 if __name__ == "__main__":

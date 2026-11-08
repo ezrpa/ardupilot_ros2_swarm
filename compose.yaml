@@ -62,6 +62,13 @@ services:
       # start_tak_sim.sh / synthetic_camera.py).
       - SIM_SENSORS=${SIM_SENSORS:-}
       - SIM_MODELS_DIR=/root/sim_models
+      # SAR search pattern: bfs | dfs (grid search from separate launch
+      # points, see sar_search.py) | strips (pre-assigned serpentine)
+      - SAR_SEARCH=${SAR_SEARCH:-strips}
+      # synthetic camera scenario (models/<name>/ground_truth.json: person +
+      # orange decoys) and imagery realism (noise, blur, shadows; 0 = clean)
+      - SIM_SCENARIO=${SIM_SCENARIO:-}
+      - SIM_REALISM=${SIM_REALISM:-1}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       #- ROS_DISCOVERY_SERVER=172.20.0.10:11888
     volumes:

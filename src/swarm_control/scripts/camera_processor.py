@@ -50,6 +50,18 @@ DEFAULT_DETECTORS = {"weed": (WEED_HSV_LOW, WEED_HSV_HIGH, WEED_MIN_AREA_PX)}
 PERSON_DETECTORS = {"person": (PERSON_HSV_LOW, PERSON_HSV_HIGH,
                                PERSON_MIN_AREA_PX)}
 
+# Shape-verified person detection (SAR). Colour alone also fires on orange
+# cones, tarps, kayaks and backpacks, so each orange blob is measured in
+# METRES (ground sample distance = alt / focal_px) and scored against a
+# person lying on the ground: ~1.3-2.0 m long, ~0.4-1.0 m wide (arms),
+# compact (solidity). The colour band is wider than PERSON_HSV_* to survive
+# sensor noise, shadow and exposure changes; shape does the rejecting.
+PERSON_SHAPE_HSV_LOW = (0, 140, 90)
+PERSON_SHAPE_HSV_HIGH = (16, 255, 255)
+PERSON_LEN_M = (1.6, 0.35)           # mean, sigma (arms + blur widen it)
+PERSON_WID_M = (0.75, 0.25)
+PERSON_MIN_CONFIDENCE = 0.35
+
 
 def detect_color_blobs(frame, hsv_low, hsv_high, min_area_px,
                        lat=None, lon=None, alt=None, heading=None):
@@ -105,6 +117,92 @@ def detect_color_blobs(frame, hsv_low, hsv_high, min_area_px,
         return detections
     except Exception:
         return []
+
+
+def _gauss(x, mu, sigma):
+    return math.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+
+def detect_person(frame, lat=None, lon=None, alt=None, heading=None,
+                  min_confidence=PERSON_MIN_CONFIDENCE, rejected=None):
+    """Shape-verified person detector. Returns detections like
+    detect_color_blobs plus 'confidence', 'length_m', 'width_m'. Candidates
+    that fail are appended to `rejected` (if a list) with a 'reason', so a
+    run can show WHY an orange object was not called a person. Never
+    raises; needs alt (AGL) to measure sizes."""
+    if not _CV2_OK or not alt or alt <= 0:
+        return []
+    try:
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, PERSON_SHAPE_HSV_LOW, PERSON_SHAPE_HSV_HIGH)
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE,
+                                cv2.getStructuringElement(
+                                    cv2.MORPH_ELLIPSE, (7, 7)))
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                       cv2.CHAIN_APPROX_SIMPLE)
+        h, w = frame.shape[:2]
+        f_px = (w / 2.0) / math.tan(CAMERA_HFOV_RAD / 2.0)
+        gsd = alt / f_px                       # metres per pixel
+        min_px = max(8.0, (0.15 / gsd) ** 2)   # ignore specks < 0.15 m
+        out = []
+        for c in contours:
+            area = cv2.contourArea(c)
+            if area < min_px:
+                continue
+            (_, _), (rw, rh), _ = cv2.minAreaRect(c)
+            length_m, width_m = max(rw, rh) * gsd, min(rw, rh) * gsd
+            hull = cv2.contourArea(cv2.convexHull(c)) or area
+            solidity = area / hull
+            aspect = length_m / max(width_m, 1e-3)
+            conf = (_gauss(length_m, *PERSON_LEN_M)
+                    * _gauss(width_m, *PERSON_WID_M)
+                    * min(1.0, solidity / 0.75))
+            bx, by, bw, bh = cv2.boundingRect(c)
+            cx, cy = bx + bw / 2.0, by + bh / 2.0
+            det = {"centroid_px": [cx, cy], "bbox": [bx, by, bw, bh],
+                   "area_px": area, "lat": None, "lon": None,
+                   "confidence": round(conf, 3),
+                   "length_m": round(length_m, 2),
+                   "width_m": round(width_m, 2),
+                   "solidity": round(solidity, 2)}
+            if lat is not None and lon is not None:
+                right = (cx - w / 2.0) * gsd
+                forward = -(cy - h / 2.0) * gsd
+                psi = 0.0 if heading is None else heading
+                north = forward * math.cos(psi) - right * math.sin(psi)
+                east = forward * math.sin(psi) + right * math.cos(psi)
+                det["lat"] = lat + north / 111111.0
+                det["lon"] = lon + east / (
+                    111111.0 * math.cos(math.radians(lat)))
+            # A blob cut by the frame edge can't be measured: a clipped
+            # kayak or tarp can look exactly person-sized. Next frame (or
+            # the confirm pass, which centres the target) will see it whole.
+            clipped = bx <= 1 or by <= 1 or bx + bw >= w - 1 or by + bh >= h - 1
+            if conf >= min_confidence and not clipped:
+                out.append(det)
+            elif rejected is not None:
+                if clipped:
+                    reason = "cut off by frame edge"
+                elif length_m < 0.9:
+                    reason = f"too small ({length_m:.1f} m)"
+                elif length_m > 2.6 or width_m > 1.2:
+                    reason = f"too large ({length_m:.1f} x {width_m:.1f} m)"
+                elif aspect < 1.8:
+                    reason = f"not elongated ({length_m:.1f} x {width_m:.1f} m)"
+                else:
+                    reason = f"shape mismatch ({length_m:.1f} x {width_m:.1f} m)"
+                rejected.append(dict(det, reason=reason))
+        out.sort(key=lambda d: -d["confidence"])
+        return out
+    except Exception:
+        return []
+
+
+# Detector map entries may be a callable (frame, lat, lon, alt, heading,
+# rejected=list) instead of an HSV tuple.
+PERSON_SHAPE_DETECTORS = {"person": detect_person}
 
 
 class CameraProcessor:
@@ -212,10 +310,17 @@ class CameraProcessor:
             return None
 
         detections = self._detect_aruco(frame)
-        found = {name: detect_color_blobs(frame, lo, hi, min_area,
-                                          lat=lat, lon=lon, alt=alt,
-                                          heading=heading)
-                 for name, (lo, hi, min_area) in self.detectors.items()}
+        found, rejected = {}, {}
+        for name, spec in self.detectors.items():
+            if callable(spec):
+                rejected[name] = []
+                found[name] = spec(frame, lat=lat, lon=lon, alt=alt,
+                                   heading=heading, rejected=rejected[name])
+            else:
+                lo, hi, min_area = spec
+                found[name] = detect_color_blobs(frame, lo, hi, min_area,
+                                                 lat=lat, lon=lon, alt=alt,
+                                                 heading=heading)
 
         stem = f"{prefix}_{wp_index:03d}"
         img_path = os.path.join(self.out_dir, f"{stem}.jpg")
@@ -236,6 +341,8 @@ class CameraProcessor:
         }
         for name, dets in found.items():
             meta[f"{name}_detections"] = dets
+        for name, rej in rejected.items():
+            meta[f"{name}_rejected"] = rej
         if extra:
             meta.update(extra)
         with open(os.path.join(self.out_dir, f"{stem}.json"), "w") as f:
@@ -245,7 +352,10 @@ class CameraProcessor:
         self._info(
             f"{stem}: saved {os.path.basename(img_path)}"
             + (f" ({len(detections)} aruco)" if detections else "")
-            + "".join(f" ({len(d)} {n})" for n, d in found.items() if d))
+            + "".join(f" ({len(d)} {n})" for n, d in found.items() if d)
+            + "".join(f" ({len(r)} {n} candidates rejected: "
+                      f"{', '.join(x['reason'] for x in r)})"
+                      for n, r in rejected.items() if r))
         return img_path
 
     def _detect_aruco(self, frame):

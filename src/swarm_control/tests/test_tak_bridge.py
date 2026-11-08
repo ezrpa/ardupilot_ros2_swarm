@@ -173,6 +173,46 @@ def test_unreachable_tcp_is_harmless():
     assert s.send(tak_cot.spot_event("x", "X", 1.0, 2.0)) is False  # backoff
 
 
+def test_sar_page_survives_link_outage():
+    """The SURVIVOR FOUND GeoChat is sent once. If the TAK link is down at
+    that moment (send() returns False), it must be retried, not lost."""
+    from tak_bridge import SinkFanout
+
+    class FlakySink:
+        url = "tls://flaky:8089"
+
+        def __init__(self):
+            self.up, self.got = False, []
+
+        def send(self, xml):
+            if self.up:
+                self.got.append(xml)
+            return self.up
+
+    logs = tempfile.mkdtemp()
+    os.makedirs(os.path.join(logs, "sar"))
+    with open(os.path.join(logs, "sar", "call.json"), "w") as f:
+        json.dump({"found_by_instance": 2, "found_by_id": 3,
+                   "lat": FIELD_ORIGIN_LAT, "lon": FIELD_ORIGIN_LON}, f)
+    bridge = SwarmTakBridge([0, 1, 2, 3], [], logs_dir=logs, mission="sar")
+    sink = FlakySink()
+    fan = SinkFanout([sink], log=lambda m: None)
+
+    fan.retry(bridge.one_shot)
+    fan.send(bridge.scan_artifacts(), bridge.one_shot)   # link down: page lost?
+    assert len(bridge.one_shot) == 1 and len(fan.pending[0]) == 1
+    fan.send(bridge.scan_artifacts(), bridge.one_shot)   # rescan: no re-page
+    assert len(fan.pending[0]) == 1
+
+    sink.up = True                                       # link restored
+    fan.retry(bridge.one_shot)
+    pages = [x for x in sink.got if "SURVIVOR FOUND" in x]
+    assert len(pages) == 1, pages
+    assert not fan.pending[0] and not bridge.one_shot
+    fan.retry(bridge.one_shot)                           # never sent twice
+    assert len([x for x in sink.got if "SURVIVOR FOUND" in x]) == 1
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

@@ -34,10 +34,11 @@ from geographic_msgs.msg import GeoPoseStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 from base_drone_dds import BaseDrone, main
-from scripts.camera_processor import PERSON_DETECTORS
+from scripts.camera_processor import PERSON_SHAPE_DETECTORS
 from scripts.synthetic_camera import make_camera
 from scripts.drone_state import DroneState, FlightMode
 from scripts import sar_coordination as sar
+from scripts import sar_search
 
 
 class SearchDrone(BaseDrone):
@@ -53,7 +54,11 @@ class SearchDrone(BaseDrone):
             'level_timeout': 10.0,
             'rally_hold_s': 180.0, 'arrive_radius': 4.0,
             'converge_timeout': 120.0, 'standby_timeout': 600.0,
-        }
+            # search pattern: bfs / dfs over the shared cell grid (each drone
+            # from its own launch point, cells claimed on the call channel)
+            # or 'strips' (the original pre-assigned serpentine waypoints)
+            'search_algo': 'bfs', 'search_area_m': 120.0, 'search_grid': 7,
+        }  # field_origin_lat/lon are declared by BaseDrone
         for name, default in p.items():
             self.declare_parameter(name, default)
         g = lambda n: self.get_parameter(n).value  # noqa: E731
@@ -74,12 +79,17 @@ class SearchDrone(BaseDrone):
         self.arrive_radius = float(g('arrive_radius'))
         self.converge_timeout = float(g('converge_timeout'))
         self.standby_timeout = float(g('standby_timeout'))
+        self.search_algo = str(g('search_algo')).lower()
+        self.grid = sar_search.Grid(
+            float(g('field_origin_lat')), float(g('field_origin_lon')),
+            float(g('search_area_m')), int(g('search_grid')))
+        self.logs_dir = str(g('logs_dir'))
         self.poll_s = 0.5           # call-channel poll interval
         self.converge_poll_s = 1.0  # arrival check / target re-send
 
         self.camera = make_camera(
             self.drone_id, int(g('camera_port')), logger=self.get_logger(),
-            detectors=PERSON_DETECTORS)
+            detectors=PERSON_SHAPE_DETECTORS)
         self.bus = sar.SarBus(str(g('logs_dir')))
         self.gps = None  # (lat, lon, alt_amsl) from /ap/geopose/filtered
         self.create_subscription(
@@ -199,38 +209,75 @@ class SearchDrone(BaseDrone):
                 rclpy.spin_once(self, timeout_sec=0.1)
 
         self.state = DroneState.FLYING
-        n = len(self.waypoints)
         call = None
-        for i, wp in enumerate(self.waypoints):
+        n = 0
+        for i, lat, lon, alt, n, label in self._search_targets():
             call = self._foreign_call()
             if call:
                 break
-            lat, lon = self.xy_to_latlon(wp[0], wp[1])
-            alt = wp[2]
-            self._status(sar.SEARCHING, wp=i + 1, of=n)
-            self._log(f"search wp {i + 1}/{n}: {lat:.7f}, {lon:.7f} @ {alt} m")
+            self._status(sar.SEARCHING, wp=i, of=n, algo=self.search_algo,
+                         cell=label)
+            self._log(f"search {label} ({i}/{n}): {lat:.7f}, {lon:.7f} "
+                      f"@ {alt} m")
             call, _ = self._fly_to(lat, lon, alt)
             if call:
                 break
 
-            meta = self._capture_here(i + 1, alt)
+            meta = self._capture_here(i, alt)
             det = sar.best_detection(meta.get('person_detections'))
             if det is None:
                 continue
             self._log(f"possible person at {det['lat']:.7f}, "
-                      f"{det['lon']:.7f} ({det['area_px']:.0f} px) - confirming")
-            call = self._confirm_and_call(det, i + 1)
+                      f"{det['lon']:.7f} (conf {det.get('confidence', 0):.2f},"
+                      f" {det['area_px']:.0f} px) - confirming")
+            call = self._confirm_and_call(det, i)
             if call:
                 break
 
         if call is None:
-            self._status(sar.SEARCH_COMPLETE, wp=n, of=n)
+            self._status(sar.SEARCH_COMPLETE, wp=n, of=n,
+                         algo=self.search_algo)
             self._log("strip searched, person not found by this drone")
             call = self._standby()
 
         if call is not None:
             self._rally(call)
         self._return_home()
+
+    def _search_targets(self):
+        """Yield (index, lat, lon, alt, total, label) search points.
+
+        bfs/dfs: plan over the shared grid from this drone's own launch
+        cell; each yielded cell is already CLAIMED by this drone, so the
+        swarm never searches a cell twice. strips: the pre-assigned
+        serpentine waypoints (original behaviour)."""
+        if self.search_algo in sar_search.ALGORITHMS:
+            board = sar_search.ClaimBoard(self.logs_dir, self.grid)
+            here = self.gps or (self.home_lat, self.home_lon, 0.0)
+            start = self.grid.cell_at(here[0], here[1])
+            planner = sar_search.SearchPlanner(
+                self.grid, start,
+                claim=lambda c: board.claim(c, self.instance,
+                                            drone_id=self.drone_id,
+                                            algo=self.search_algo),
+                is_claimed=board.is_claimed, algorithm=self.search_algo)
+            total = self.grid.n * self.grid.n
+            self._log(f"{self.search_algo.upper()} grid search from cell "
+                      f"{start} ({self.grid.n}x{self.grid.n}, "
+                      f"{self.grid.cell_m:.0f} m cells)")
+            k = 0
+            while True:
+                cell = planner.next_cell()
+                if cell is None:
+                    return
+                k += 1
+                lat, lon = self.grid.center_latlon(cell)
+                yield k, lat, lon, self.search_alt, total, \
+                    f"cell r{cell[0]}c{cell[1]}"
+        n = len(self.waypoints)
+        for i, wp in enumerate(self.waypoints):
+            lat, lon = self.xy_to_latlon(wp[0], wp[1])
+            yield i + 1, lat, lon, wp[2], n, f"wp {i + 1}"
 
     def _standby(self):
         """Strip done, nothing found: hover and listen until the rest of the
@@ -270,6 +317,8 @@ class SearchDrone(BaseDrone):
             self.instance, self.drone_id, confirmed['lat'], confirmed['lon'],
             self.confirm_alt, first_sighting=[det['lat'], det['lon']],
             area_px=confirmed['area_px'],
+            confidence=confirmed.get('confidence'),
+            size_m=[confirmed.get('length_m'), confirmed.get('width_m')],
             image=f"drone_{self.drone_id}/confirm_{wp_index:03d}.jpg")
         if won:
             self._log(f"PERSON CONFIRMED at {call['lat']:.7f}, "

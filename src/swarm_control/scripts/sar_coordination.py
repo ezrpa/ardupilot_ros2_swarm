@@ -50,10 +50,12 @@ def offset_latlon(lat, lon, north, east):
 
 
 def best_detection(dets):
-    """Largest georeferenced blob (the most pixels = most reliable), or None."""
+    """Most reliable georeferenced detection, or None: highest shape
+    confidence when the detector provides one, else the largest blob."""
     geo = [d for d in (dets or [])
            if d.get("lat") is not None and d.get("lon") is not None]
-    return max(geo, key=lambda d: d.get("area_px", 0)) if geo else None
+    return max(geo, key=lambda d: (d.get("confidence", 0.0),
+                                   d.get("area_px", 0))) if geo else None
 
 
 def match_detection(dets, lat, lon, radius_m):

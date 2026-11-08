@@ -1,0 +1,78 @@
+{
+  "description": "No-Gazebo SAR scenario for synthetic_camera.py: the casualty (generate_missing_person.py --seed 33) plus orange decoys that pass the colour test but must fail the shape test.",
+  "person": {
+    "x": 7.736,
+    "y": 14.546,
+    "yaw": 1.9918,
+    "lat": 40.07297291,
+    "lon": -105.23048402
+  },
+  "distractors": [
+    {
+      "kind": "cone",
+      "north_m": 40.0,
+      "east_m": 44.0,
+      "lat": 40.073202,
+      "lon": -105.23005751,
+      "length_m": 0.35,
+      "width_m": 0.35,
+      "yaw": 0.0,
+      "note": "hi-vis orange traffic cone: right colour, far too small"
+    },
+    {
+      "kind": "cone",
+      "north_m": -31.0,
+      "east_m": 29.0,
+      "lat": 40.072563,
+      "lon": -105.23023392,
+      "length_m": 0.35,
+      "width_m": 0.35,
+      "yaw": 0.0,
+      "note": "second cone"
+    },
+    {
+      "kind": "cone",
+      "north_m": 22.0,
+      "east_m": -3.0,
+      "lat": 40.07304,
+      "lon": -105.23061028,
+      "length_m": 0.35,
+      "width_m": 0.35,
+      "yaw": 0.0,
+      "note": "cone a few metres from the casualty"
+    },
+    {
+      "kind": "tarp",
+      "north_m": -12.0,
+      "east_m": -36.0,
+      "lat": 40.072734,
+      "lon": -105.2309984,
+      "length_m": 2.6,
+      "width_m": 2.0,
+      "yaw": 0.4,
+      "note": "orange tarp: too large, not elongated"
+    },
+    {
+      "kind": "kayak",
+      "north_m": 33.0,
+      "east_m": -31.0,
+      "lat": 40.073139,
+      "lon": -105.2309396,
+      "length_m": 3.4,
+      "width_m": 0.7,
+      "yaw": 1.1,
+      "note": "orange kayak: elongated but far too long"
+    },
+    {
+      "kind": "backpack",
+      "north_m": 4.0,
+      "east_m": 26.0,
+      "lat": 40.072878,
+      "lon": -105.23026921,
+      "length_m": 0.55,
+      "width_m": 0.35,
+      "yaw": -0.6,
+      "note": "orange backpack: too small"
+    }
+  ]
+}

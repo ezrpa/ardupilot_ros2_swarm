@@ -12,6 +12,7 @@ from launch.actions import (DeclareLaunchArgument, ExecuteProcess, LogInfo,
                             OpaqueFunction, TimerAction)
 from launch_ros.actions import Node
 import json
+import os
 
 from scripts.points_distributor import generate_grid_waypoints, split_serpentine
 
@@ -37,13 +38,17 @@ def launch_setup(context, *args, **kwargs):
     rmw = context.launch_configurations.get('rmw_implementation',
                                             'rmw_fastrtps_cpp')
     instances = list(range(num_drones))
+    # bfs / dfs: coordinated grid search from separate launch points
+    # (SPAWN_LAYOUT=corners); strips: pre-assigned serpentine (original)
+    search_algo = os.environ.get('SAR_SEARCH', 'strips') or 'strips'
 
     wps = generate_grid_waypoints(field_size=SEARCH_AREA_M,
                                   grid_points=SEARCH_GRID, height=SEARCH_ALT)
     chunks = split_serpentine(wps, num_drones)
 
     actions = [LogInfo(msg=f"SAR: {num_drones} search drones, {len(wps)} "
-                           f"waypoints over {SEARCH_AREA_M:.0f} m square")]
+                           f"waypoints over {SEARCH_AREA_M:.0f} m square, "
+                           f"search={search_algo}")]
     for i in instances:
         node = Node(
             package='swarm_control',
@@ -63,6 +68,9 @@ def launch_setup(context, *args, **kwargs):
                 'logs_dir': '/root/logs',
                 'search_alt': SEARCH_ALT,
                 'confirm_alt': CONFIRM_ALT,
+                'search_algo': search_algo,
+                'search_area_m': SEARCH_AREA_M,
+                'search_grid': SEARCH_GRID,
             }],
             additional_env={'ROS_DOMAIN_ID': str(i + 1),
                             'RMW_IMPLEMENTATION': rmw},

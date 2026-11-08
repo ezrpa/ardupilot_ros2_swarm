@@ -54,12 +54,17 @@ try:
     from tak_cot import (make_sender, TRANSPORTS, drone_event, spot_event, rectangle_event,
                          delete_event, casevac_event, chat_event,
                          ne_to_latlon, course_speed, MAGENTA,
-                         SPRAYER_PALETTE)
+                         SPRAYER_PALETTE, argb)
 except ImportError:  # installed as the `scripts` python package
     from scripts.tak_cot import (make_sender, TRANSPORTS, drone_event, spot_event,
                                  rectangle_event, delete_event, casevac_event,
                                  chat_event, ne_to_latlon, course_speed,
-                                 MAGENTA, SPRAYER_PALETTE)
+                                 MAGENTA, SPRAYER_PALETTE, argb)
+
+# Searched-cell colours per drone instance (alpha, r, g, b); the viewer's
+# drone palette uses the same order.
+CELL_PALETTE = [(70, 56, 214, 245), (70, 245, 184, 61), (70, 163, 230, 53),
+                (70, 192, 132, 252), (70, 244, 114, 182), (70, 96, 165, 250)]
 
 # Must match compose_decentralized.launch.py / start_drone_container.sh
 FIELD_ORIGIN_LAT = 40.072842
@@ -108,6 +113,10 @@ class SwarmTakBridge:
         self.sar_call = None
         self.sar_status = {}       # instance -> status dict
         self._sar_mtime = {}
+        self.sar_cells = {}        # "rRcC" -> claim record (grid search)
+        # Events that are sent ONCE, not re-sent every cycle (the SAR call's
+        # GeoChat page): SinkFanout retries these until a sink accepts them.
+        self.one_shot = set()
 
     # --------------------------------------------------------- identity
     def role(self, inst):
@@ -214,7 +223,25 @@ class SwarmTakBridge:
             return "SAR: ON SCENE" + (" (finder)" if st.get("finder") else "")
         return f"SAR: {state.replace('_', ' ')}"
 
+    def _grid_info(self):
+        """(ALGO, total cells) of a BFS/DFS grid search, remembered once
+        seen: rally/on-scene statuses no longer carry 'algo'."""
+        for st in self.sar_status.values():
+            if st.get("algo") in ("bfs", "dfs") and st.get("of"):
+                self._grid = (st["algo"].upper(), int(st["of"]))
+        return getattr(self, "_grid", None)
+
     def _sar_field_status(self):
+        grid = self._grid_info()
+        grid_total = grid[1] if grid else 0
+        grid_txt = (f"{grid[0]} grid search: {len(self.sar_cells)}/"
+                    f"{grid_total} cells searched") if grid else ""
+        if grid_total and not self.sar_call:
+            if self.sar_status and all(
+                    st.get("state") in ("search_complete", "returning")
+                    for st in self.sar_status.values()):
+                return "search complete - person NOT found"
+            return grid_txt
         done = sum(min(st.get("wp", 0), st.get("of", 0))
                    for st in self.sar_status.values()
                    if st.get("state") in ("searching", "search_complete"))
@@ -230,7 +257,8 @@ class SwarmTakBridge:
         c = self.sar_call
         return (f"PERSON FOUND by SEARCH-{c.get('found_by_id')} at "
                 f"{c['lat']:.6f}, {c['lon']:.6f} | {on_scene}/"
-                f"{len(self.instances)} drones on scene")
+                f"{len(self.instances)} drones on scene"
+                + (f" | {grid_txt}" if grid_txt else ""))
 
     def field_event(self, now=None):
         if self.mission == "sar":
@@ -254,6 +282,7 @@ class SwarmTakBridge:
         out = [self.field_event(now)]
         if self.sar_call:
             out.append(self._casevac(now))
+        out += [self._cell_event(c, now) for c in self.sar_cells.values()]
         with self._lock:
             items = (list(self.targets.items()) if self._plan_ready
                      else list(self.detections.items()))
@@ -302,8 +331,39 @@ class SwarmTakBridge:
         self._sar_mtime[path] = m
         return data
 
-    def _scan_sar(self, now):
+    def _cell_event(self, claim, now=None):
+        """Searched grid cell (claimed by one drone), drawn in that drone's
+        colour so TAK shows how the BFS/DFS fronts sweep the area."""
+        inst = int(claim.get("instance", 0))
+        a, r, g, b = CELL_PALETTE[inst % len(CELL_PALETTE)]
+        return rectangle_event(
+            f"{self.prefix}-cell-r{claim['row']}c{claim['col']}",
+            f"{self.callsign(inst)} r{claim['row']}c{claim['col']}",
+            [tuple(p) for p in claim["corners"]],
+            stroke=argb(160, r, g, b), fill=argb(a, r, g, b),
+            remarks=f"searched by {self.callsign(inst)} "
+                    f"({claim.get('algo', '?').upper()})", now=now)
+
+    def _scan_claims(self, now):
         out = []
+        cdir = os.path.join(self.logs_dir, "sar", "claims")
+        for path in glob.glob(os.path.join(cdir, "r*c*.json")):
+            key = os.path.basename(path)[:-5]
+            if key in self.sar_cells:
+                continue
+            try:
+                with open(path) as f:
+                    claim = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue  # mid-write
+            if "corners" in claim:
+                self.sar_cells[key] = claim
+                self._field_dirty = True
+                out.append(self._cell_event(claim, now))
+        return out
+
+    def _scan_sar(self, now):
+        out = self._scan_claims(now)
         sar_dir = os.path.join(self.logs_dir, "sar")
         for path in glob.glob(os.path.join(sar_dir, "status_*.json")):
             st = self._read_json_if_changed(path)
@@ -317,12 +377,14 @@ class SwarmTakBridge:
             self._field_dirty = True
             out.append(self._casevac(now))
             finder = call.get("found_by_instance", 0)
-            out.append(chat_event(
+            page = chat_event(
                 self.drone_uid(finder), f"SEARCH-{call.get('found_by_id')}",
                 f"SURVIVOR FOUND by SEARCH-{call.get('found_by_id')} at "
                 f"{call['lat']:.6f}, {call['lon']:.6f}. All search drones "
                 f"converging. CASEVAC point 'SURVIVOR' dropped.",
-                call["lat"], call["lon"], now=now))
+                call["lat"], call["lon"], now=now)
+            self.one_shot.add(page)
+            out.append(page)
         return out
 
     def _scan_sidecars(self, now):
@@ -530,6 +592,42 @@ def parse_args(argv=None):
     return args
 
 
+class SinkFanout:
+    """Sends every event to every sink. Most CoT is a live picture that the
+    bridge re-sends each cycle, so a dropped event is harmless. A one-shot
+    event (the SAR GeoChat page) is NOT re-sent: send() returns False while
+    a TCP/TLS link is down or reconnecting, and the page would be lost
+    silently. Such events are kept per sink and retried until accepted."""
+
+    def __init__(self, sinks, log=print, max_pending=50):
+        self.sinks = list(sinks)
+        self.log = log
+        self.max_pending = max_pending
+        self.pending = [[] for _ in self.sinks]
+
+    def send(self, events, must_deliver=()):
+        for xml in events:
+            for i, s in enumerate(self.sinks):
+                if not s.send(xml) and xml in must_deliver:
+                    q = self.pending[i]
+                    if len(q) < self.max_pending:
+                        q.append(xml)
+                        self.log(f"[tak] one-shot event not delivered to "
+                                 f"{getattr(s, 'url', s)}; will retry")
+
+    def retry(self, must_deliver=None):
+        for i, s in enumerate(self.sinks):
+            if self.pending[i]:
+                left = [x for x in self.pending[i] if not s.send(x)]
+                if len(left) < len(self.pending[i]):
+                    self.log(f"[tak] delivered "
+                             f"{len(self.pending[i]) - len(left)} retried "
+                             f"one-shot event(s) to {getattr(s, 'url', s)}")
+                self.pending[i] = left
+        if must_deliver is not None and not any(self.pending):
+            must_deliver.clear()  # all delivered: stop tracking them
+
+
 def main(argv=None):
     args = parse_args(argv)
     log = lambda m: print(m, flush=True)  # noqa: E731
@@ -543,10 +641,8 @@ def main(argv=None):
         field_half_m=args.field_half, video_url=args.video_url,
         replace_detections=not args.keep_detections, mission=args.mission)
 
-    def send_all(events):
-        for xml in events:
-            for s in sinks:
-                s.send(xml)
+    fanout = SinkFanout(sinks, log=log)
+    send_all = fanout.send
 
     if not args.no_telemetry:
         try:
@@ -564,9 +660,10 @@ def main(argv=None):
     try:
         while True:
             now = time.time()
+            fanout.retry(bridge.one_shot)
             send_all(bridge.drone_events(now))
             if now >= next_scan:
-                send_all(bridge.scan_artifacts(now))
+                send_all(bridge.scan_artifacts(now), bridge.one_shot)
                 next_scan = now + args.scan_period
             if now >= next_static:
                 send_all(bridge.static_events(now))

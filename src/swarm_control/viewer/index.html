@@ -46,7 +46,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 #status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; animation: blink 1.4s infinite; }
 @keyframes blink { 50% { opacity: .35; } }
 .st-wait { color: var(--muted); } .st-search { color: var(--amber); }
-.st-found { color: var(--red); } .st-scene { color: var(--green); }
+.st-found { color: var(--red); } .st-scene { color: var(--green); } .st-rtb { color: var(--cyan); }
 
 /* ---------- side panel ---------- */
 #panel { position: absolute; top: 14px; right: 14px; bottom: 14px; width: 376px; z-index: 500;
@@ -55,6 +55,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 .sec { padding: 14px 16px; border-bottom: 1px solid var(--line); }
 .sec h2 { margin: 0 0 10px; font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: var(--muted);
   letter-spacing: .14em; text-transform: uppercase; display: flex; justify-content: space-between; }
+.algo { color: var(--cyan); font-weight: 600; margin-left: 6px; }
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .kpi { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .kpi .v { font-family: var(--mono); font-size: 20px; font-weight: 600; }
@@ -78,7 +79,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 #survivor.show { display: block; background: linear-gradient(180deg, rgba(255,77,79,.14), transparent); }
 #survivor h2 { color: #ff8a8c; }
 .sv { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: start; }
-.sv img { width: 112px; height: 84px; object-fit: none; object-position: center; border-radius: 6px; border: 1px solid rgba(255,77,79,.5); background: #222; }
+.sv canvas { width: 112px; height: 84px; border-radius: 6px; border: 1px solid rgba(255,77,79,.5); background: #222; }
 .sv .t { font-size: 13px; line-height: 1.35; }
 .sv .coord { font-family: var(--mono); font-size: 11.5px; color: #ffb3b4; margin-top: 6px; }
 
@@ -144,10 +145,10 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 
 <aside id="panel">
   <div class="sec">
-    <h2><span>Mission</span><span id="clock">--:--:--</span></h2>
+    <h2><span>Mission <b id="algo" class="algo"></b></span><span id="clock">--:--:--</span></h2>
     <div class="kpis">
       <div class="kpi"><div class="v" id="k-drones">0</div><div class="l">drones in picture</div></div>
-      <div class="kpi"><div class="v" id="k-cov">0%</div><div class="l">area searched</div></div>
+      <div class="kpi"><div class="v" id="k-cov">0%</div><div class="l" id="k-cov-l">area searched</div></div>
       <div class="kpi"><div class="v" id="k-time">00:00</div><div class="l">mission time</div></div>
     </div>
     <div class="bar" id="bar"><i id="bar-fill"></i></div>
@@ -156,7 +157,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
   <div class="sec" id="survivor">
     <h2><span>Survivor located</span><span id="sv-time"></span></h2>
     <div class="sv">
-      <img id="sv-img" alt="confirmation frame">
+      <canvas id="sv-img" width="224" height="168" aria-label="confirmation frame, cropped on the detection"></canvas>
       <div><div class="t" id="sv-text"></div><div class="coord" id="sv-coord"></div></div>
     </div>
   </div>
@@ -167,7 +168,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 
 <div id="legend">
   <span><i class="lg-area"></i>search area</span>
-  <span><i class="lg-cov"></i>camera coverage</span>
+  <span><i class="lg-cov"></i>cell searched (drone colour)</span>
   <span><i class="lg-trail"></i>flight track</span>
   <span><i class="lg-surv"></i>survivor (CASEVAC)</span>
 </div>
@@ -187,6 +188,7 @@ L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/
 L.rectangle([[-85, -180], [85, 180]], { stroke: false, fillColor: "#05080c", fillOpacity: 0.28, interactive: false }).addTo(map);
 
 const layers = { area: L.layerGroup().addTo(map), cov: L.layerGroup().addTo(map), trail: L.layerGroup().addTo(map),
+  cells: L.layerGroup().addTo(map), grid: L.layerGroup().addTo(map),
   links: L.layerGroup().addTo(map), marks: L.layerGroup().addTo(map), drones: L.layerGroup().addTo(map) };
 const droneLayer = {}, colorOf = {}, covDrawn = {};
 let fitted = false, firstSeen = null, areaPoly = null, survivorMarker = null, userMoved = false;
@@ -202,8 +204,13 @@ window.addEventListener("resize", () => { if (!userMoved) fitArea(); });
 map.on("dragstart", () => { userMoved = true; });
 map.getContainer().addEventListener("wheel", () => { userMoved = true; }, { passive: true });
 
+// Drone colour by instance (uid "...-drone-<i>"), the same order the TAK
+// bridge uses for each drone's searched grid cells.
 function color(uid) {
-  if (!(uid in colorOf)) colorOf[uid] = PALETTE[Object.keys(colorOf).length % PALETTE.length];
+  if (!(uid in colorOf)) {
+    const m = /-drone-(\d+)$/.exec(uid);
+    colorOf[uid] = PALETTE[(m ? +m[1] : Object.keys(colorOf).length) % PALETTE.length];
+  }
   return colorOf[uid];
 }
 function argbToCss(v, alphaOverride) {
@@ -250,7 +257,15 @@ function render(s) {
   document.getElementById("foot-n").textContent = `${s.events_rx.toLocaleString()} CoT events`;
 
   const drones = s.items.filter(i => i.type.startsWith("a-")).sort((a, b) => (a.callsign > b.callsign ? 1 : -1));
-  const area = s.items.find(i => i.type === "u-d-r");
+  const area = s.items.find(i => i.type === "u-d-r" && !i.uid.includes("-cell-"));
+  const cells = s.items.filter(i => i.type === "u-d-r" && i.uid.includes("-cell-"));
+  // the area's remarks switch to "PERSON FOUND ..." after the call, so
+  // remember the search algorithm and grid size once seen
+  const gridM = /(BFS|DFS) grid search: (\d+)\/(\d+) cells/.exec(area?.remarks || "");
+  if (gridM) gridSeen = { algo: gridM[1], total: +gridM[3] };
+  const algo = gridSeen ? gridSeen.algo : (cells.length ? "cell" : null);
+  const gridTotal = gridSeen ? gridSeen.total : 0;
+  drawCells(cells, area, gridTotal);
   const casevac = s.items.find(i => i.type.startsWith("b-r-f-h-c"));
 
   // --- search area
@@ -283,7 +298,7 @@ function render(s) {
     L_.marker.setLatLng([d.lat, d.lon]).setIcon(droneIcon(d, col)).setOpacity(d.is_stale ? 0.45 : 1);
     const fps = d.footprints || [];
     for (let k = covDrawn[d.uid]; k < fps.length; k++)
-      L.polygon(footprint(fps[k]), { stroke: false, fillColor: col, fillOpacity: 0.11, interactive: false }).addTo(layers.cov);
+      L.polygon(footprint(fps[k]), { stroke: false, fillColor: col, fillOpacity: 0.05, interactive: false }).addTo(layers.cov);
     covDrawn[d.uid] = fps.length;
   });
 
@@ -326,7 +341,13 @@ function render(s) {
   // --- panel: status
   const pill = document.getElementById("status-pill"), txt = document.getElementById("status-txt");
   const onScene = drones.filter(d => (d.sar || "").startsWith("ON SCENE")).length;
-  if (casevac && drones.length && onScene === drones.length) { pill.className = "st-scene"; txt.textContent = `ALL ${onScene} UNITS ON SCENE`; }
+  const airborne = drones.filter(d => (d.agl ?? 0) > 1).length;
+  const rtb = drones.filter(d => /^returning/.test(d.sar || "") || /^(RTL|LAND)$/.test(d.mode || "")).length;
+  if (casevac && drones.length && rtb === drones.length) {
+    pill.className = airborne ? "st-rtb" : "st-scene";
+    txt.textContent = airborne ? `SURVIVOR FOUND · ${airborne} UNITS RETURNING` : "MISSION COMPLETE · ALL UNITS LANDED";
+  }
+  else if (casevac && drones.length && onScene === drones.length) { pill.className = "st-scene"; txt.textContent = `ALL ${onScene} UNITS ON SCENE`; }
   else if (casevac) { pill.className = "st-found"; txt.textContent = `SURVIVOR FOUND · ${onScene}/${drones.length} ON SCENE`; }
   else if (drones.length) { pill.className = "st-search"; txt.textContent = "SEARCH IN PROGRESS"; }
   else { pill.className = "st-wait"; txt.textContent = "WAITING FOR COT"; }
@@ -338,13 +359,17 @@ function render(s) {
   document.getElementById("bar-l").textContent = casevac ? "search terminated: survivor found" : "search progress";
   document.getElementById("bar-r").textContent = total ? `${done} / ${total} waypoints` : "";
   document.getElementById("k-drones").textContent = drones.length;
+  if (gridTotal) pct = Math.round(100 * cells.length / gridTotal);
   document.getElementById("k-cov").textContent = `${pct}%`;
+  document.getElementById("k-cov-l").textContent = gridTotal ? `${cells.length}/${gridTotal} cells searched` : "area searched";
+  document.getElementById("algo").textContent = algo ? `${algo} grid search` : "";
   document.getElementById("k-time").textContent = mmss(s.now - (s.first_track ?? (s.now - s.uptime)));
 
   // drones list
-  document.getElementById("units-n").textContent = `${drones.length} airborne`;
+  document.getElementById("units-n").textContent = `${airborne} airborne`;
   document.getElementById("drones").innerHTML = drones.map(d => {
-    const [cls, st] = sarClass(d.sar);
+    let [cls, st] = sarClass(d.sar);
+    if (st === "RTB" && (d.agl ?? 1) < 1) st = "landed";
     const bits = [d.mode, d.agl != null ? `${d.agl.toFixed(1)} m AGL` : null, d.speed != null ? `${d.speed.toFixed(1)} m/s` : null,
       d.battery != null ? `${d.battery.toFixed(0)}%` : null].filter(Boolean).join(" · ");
     return `<div class="drone"><div class="sw" style="background:${color(d.uid)}"></div>
@@ -358,7 +383,7 @@ function render(s) {
     sv.classList.add("show");
     const im = /Image: (\S+\.jpg)/.exec(casevac.remarks || "");
     const img = document.getElementById("sv-img");
-    if (im && img.dataset.src !== im[1]) { img.dataset.src = im[1]; img.src = `/logs/${im[1]}`; img.onerror = () => { img.style.display = "none"; }; }
+    if (im && img.dataset.src !== im[1]) { img.dataset.src = im[1]; drawDetectionCrop(img, `/logs/${im[1]}`); }
     document.getElementById("sv-text").textContent = (casevac.remarks || "").split(". Image")[0].split(" (")[0];
     document.getElementById("sv-coord").textContent = `${casevac.lat.toFixed(6)}, ${casevac.lon.toFixed(6)}`;
     // call time = when the CASEVAC first arrived (the event itself is re-broadcast every 30 s)
@@ -371,6 +396,65 @@ function render(s) {
     const t = esc(f.text).replace(/^([^:]+):/, f.kind === "chat" ? "<b>$1:</b>" : "$1:");
     return `<li class="${f.kind}"><time>${hhmmss(f.t)}</time><span>${t}</span></li>`;
   }).join("");
+}
+
+// Survivor thumbnail: crop the confirmation frame around the detection. The
+// finder is rarely exactly overhead, so a centre crop can miss the person;
+// locate the hi-vis orange pixels (same band the detector uses) instead.
+function drawDetectionCrop(canvas, url) {
+  const im = new Image();
+  im.onload = () => {
+    const w = im.naturalWidth, h = im.naturalHeight, off = document.createElement("canvas");
+    off.width = w; off.height = h;
+    const o = off.getContext("2d"); o.drawImage(im, 0, 0);
+    const px = o.getImageData(0, 0, w, h).data;
+    let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) {
+      const i = (y * w + x) * 4, r = px[i], g = px[i + 1], b = px[i + 2];
+      if (r > 190 && g > 40 && g < 160 && b < 70) { sx += x; sy += y; n++; }
+    }
+    const cx = n ? sx / n : w / 2, cy = n ? sy / n : h / 2;
+    const cw = Math.min(w, 160), ch = cw * 0.75;                   // ~2.4x zoom
+    const x0 = Math.max(0, Math.min(w - cw, cx - cw / 2)), y0 = Math.max(0, Math.min(h - ch, cy - ch / 2));
+    const c = canvas.getContext("2d"), k = canvas.width / cw;
+    c.imageSmoothingEnabled = true;
+    c.drawImage(im, x0, y0, cw, ch, 0, 0, canvas.width, canvas.height);
+    if (n) {                                                        // reticle on the detection
+      const rx = (cx - x0) * k, ry = (cy - y0) * k, R = 46;
+      c.strokeStyle = "#ff4d4f"; c.lineWidth = 3;
+      c.beginPath(); c.arc(rx, ry, R, 0, 2 * Math.PI); c.stroke();
+      [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
+        c.beginPath(); c.moveTo(rx + dx * (R - 10), ry + dy * (R - 10)); c.lineTo(rx + dx * (R + 12), ry + dy * (R + 12)); c.stroke(); });
+    }
+  };
+  im.onerror = () => { canvas.style.display = "none"; };
+  im.src = url;
+}
+
+// Searched cells (one CoT rectangle per claimed cell, drone colour) + a faint
+// n x n grid over the search area so the BFS/DFS fronts read clearly.
+const cellDrawn = {};
+let gridSeen = null;
+let gridKey = null;
+function drawCells(cells, area, total) {
+  cells.forEach(c => {
+    if (cellDrawn[c.uid] || !c.polygon) return;
+    const fill = c.fillColor != null ? argbToCss(c.fillColor, 0.34) : "rgba(56,214,245,.3)";
+    const stroke = c.strokeColor != null ? argbToCss(c.strokeColor, 0.9) : "#38d6f5";
+    cellDrawn[c.uid] = L.polygon(c.polygon, { color: stroke, weight: 1, fillColor: fill, fillOpacity: 1, interactive: false }).addTo(layers.cells);
+  });
+  const n = Math.round(Math.sqrt(total || 0));
+  if (!area || !area.polygon || n < 2) return;
+  const key = JSON.stringify(area.polygon) + n;
+  if (key === gridKey) return;
+  gridKey = key; layers.grid.clearLayers();
+  const lats = area.polygon.map(p => p[0]), lons = area.polygon.map(p => p[1]);
+  const la0 = Math.min(...lats), la1 = Math.max(...lats), lo0 = Math.min(...lons), lo1 = Math.max(...lons);
+  for (let k = 1; k < n; k++) {
+    const la = la0 + (la1 - la0) * k / n, lo = lo0 + (lo1 - lo0) * k / n;
+    L.polyline([[la, lo0], [la, lo1]], { color: "#38d6f5", weight: 1, opacity: 0.28, interactive: false }).addTo(layers.grid);
+    L.polyline([[la0, lo], [la1, lo]], { color: "#38d6f5", weight: 1, opacity: 0.28, interactive: false }).addTo(layers.grid);
+  }
 }
 
 async function tick() {

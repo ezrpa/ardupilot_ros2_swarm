@@ -29,6 +29,17 @@ MICRO_ROS_AGENT_PORT=$((2019+INSTANCE))
 if [ "${USE_GAZEBO:-0}" = "1" ]; then
     LAT_OFFSET=40.072842
     LON_OFFSET=-105.230575
+elif [ "${SPAWN_LAYOUT:-}" = "corners" ]; then
+    # Separate launch points (SAR grid search): the corners of the
+    # SPAWN_AREA_M square around the field origin, inset 8 m, then the edge
+    # midpoints. Must match sar_search.launch_points().
+    read LAT_OFFSET LON_OFFSET < <(awk -v inst="$INSTANCE" -v size="${SPAWN_AREA_M:-120}" 'BEGIN{
+        h = size / 2 - 8
+        split(h" "h" "(-h)" "(-h)" "h" "(-h)" "(-h)" "h" 0 "h" 0 "(-h)" "h" 0 "(-h)" 0", v, " ")
+        k = inst % 8; n = v[2*k+1]; e = v[2*k+2]
+        lat0 = 40.072842; lon0 = -105.230575
+        printf "%.7f %.7f\n", lat0 + n / 111111.0, lon0 + e / (111111.0 * cos(lat0 * 3.14159265358979 / 180))
+    }')
 else
     LAT_OFFSET=$(awk -v base=40.072842 -v inst="$INSTANCE" 'BEGIN{printf "%.6f", base + (inst * 0.000045)}')
     LON_OFFSET=$(awk -v base=-105.230575 -v inst="$INSTANCE" 'BEGIN{printf "%.6f", base + (inst * 0.000045)}')

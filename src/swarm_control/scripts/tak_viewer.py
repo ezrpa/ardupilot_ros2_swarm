@@ -175,7 +175,7 @@ class Picture:
                 if t.startswith("b-r-f-h-c"):
                     self._log("alert", f"CASEVAC point '{ev.get('callsign')}'"
                                        f" at {ev['lat']:.6f}, {ev['lon']:.6f}")
-                elif t == "u-d-r":
+                elif t == "u-d-r" and "-cell-" not in ev["uid"]:
                     self._log("info", f"area '{ev.get('callsign')}' received")
             self.items[ev["uid"]] = ev
             return ev

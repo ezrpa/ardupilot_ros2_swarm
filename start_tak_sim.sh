@@ -24,9 +24,16 @@ export TAK_URL=${TAK_URL:-udp://239.2.3.1:6969}
 export TAK_TRANSPORT=${TAK_TRANSPORT:-auto}
 export SIM_SENSORS=synthetic
 export USE_GAZEBO=0
+# SAR: drones launch from separate corners and run a coordinated grid
+# search (bfs | dfs | strips)
+if [ "${SWARM_MISSION}" = "sar" ]; then
+    export SAR_SEARCH=${SAR_SEARCH:-bfs}
+    export SPAWN_LAYOUT=${SPAWN_LAYOUT:-corners}
+    export SIM_SCENARIO=${SIM_SCENARIO:-sar_scenario}
+fi
 VIEWER_PORT=${TAK_VIEWER_PORT:-8088}
 
-echo "TAK sim: mission=${SWARM_MISSION} drones=${NUM_DRONES} cot=${TAK_URL}"
+echo "TAK sim: mission=${SWARM_MISSION} drones=${NUM_DRONES} search=${SAR_SEARCH:-n/a} cot=${TAK_URL}"
 
 # Rebuild only if the PyTAK layer is missing (first run after this change).
 if ! docker run --rm --entrypoint python3 ardupilot_ros2_swarm-swarm_controller \
@@ -37,6 +44,10 @@ fi
 docker compose --profile tak build tak_viewer >/dev/null
 
 docker compose --profile tak up -d tak_viewer
+# Fresh controller every run: `compose up` keeps an unchanged container, which
+# would skip the log archiving (a stale logs/sar/call.json makes every new
+# SearchDrone rally on the OLD survivor) and keep the finished launch alive.
+docker compose rm -sf swarm_controller >/dev/null 2>&1 || true
 ./start_swarm.sh "${NUM_DRONES}"
 
 echo

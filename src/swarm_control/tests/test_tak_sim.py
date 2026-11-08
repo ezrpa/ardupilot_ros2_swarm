@@ -21,6 +21,8 @@ import time
 HERE = os.path.dirname(__file__)
 sys.path.insert(0, os.path.join(HERE, '..', 'scripts'))
 MODELS = os.path.join(HERE, '..', '..', 'custom_gz', 'models')
+if not os.path.isdir(MODELS):  # inside the container: compose mount
+    MODELS = os.environ.get("SIM_MODELS_DIR", "/root/sim_models")
 
 import camera_processor as cp  # noqa: E402
 import synthetic_camera as sc  # noqa: E402
