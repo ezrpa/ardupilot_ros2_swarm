@@ -2,7 +2,7 @@
 import functools
 import time
 import rclpy
-from typing import Optional, TypeVar, Callable, Any
+from typing import Optional, TypeVar, Callable
 
 T = TypeVar('T')
 
@@ -39,6 +39,6 @@ class TimeoutRetry:
                 time.sleep(self.retry_interval)
                 rclpy.spin_once(node_self, timeout_sec=0.1)
 
-            raise TimeoutError(f"Operation timed out")
+            raise TimeoutError("Operation timed out")
 
         return wrapper

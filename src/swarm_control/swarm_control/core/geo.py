@@ -16,29 +16,33 @@ transverse Mercator for waypoints), so the same point read up to ~0.26%
 differently depending on which module asked.
 """
 import math
+from typing import Tuple
+
+LatLon = Tuple[float, float]
+NorthEast = Tuple[float, float]
 
 M_PER_DEG_LAT = 0.011131884502145034 * 1e7  # = 111318.84502145034
 
 
-def longitude_scale(lat):
+def longitude_scale(lat: float) -> float:
     """cos(lat), floored like ArduPilot's Location::longitude_scale."""
     return max(math.cos(math.radians(lat)), 0.01)
 
 
-def offset_latlon(lat, lon, north, east):
+def offset_latlon(lat: float, lon: float, north: float, east: float) -> LatLon:
     """Point `north`/`east` metres from (lat, lon) (Location::offset)."""
     dlat = north / M_PER_DEG_LAT
     dlon = east / (M_PER_DEG_LAT * longitude_scale(lat + dlat / 2.0))
     return lat + dlat, lon + dlon
 
 
-def ne_between(lat1, lon1, lat2, lon2):
+def ne_between(lat1: float, lon1: float, lat2: float, lon2: float) -> NorthEast:
     """(north, east) metres from point 1 to point 2 (Location::get_distance_NE)."""
     return ((lat2 - lat1) * M_PER_DEG_LAT,
             (lon2 - lon1) * M_PER_DEG_LAT * longitude_scale((lat1 + lat2) / 2.0))
 
 
-def distance_m(lat1, lon1, lat2, lon2):
+def distance_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Ground distance in metres (Location::get_distance)."""
     return math.hypot(*ne_between(lat1, lon1, lat2, lon2))
 
@@ -46,14 +50,14 @@ def distance_m(lat1, lon1, lat2, lon2):
 class LocalFrame:
     """North/east metres relative to a fixed GPS origin (e.g. the field origin)."""
 
-    def __init__(self, lat0, lon0):
+    def __init__(self, lat0: float, lon0: float) -> None:
         self.lat0, self.lon0 = float(lat0), float(lon0)
 
-    def to_latlon(self, north, east):
+    def to_latlon(self, north: float, east: float) -> LatLon:
         return offset_latlon(self.lat0, self.lon0, north, east)
 
-    def to_ne(self, lat, lon):
+    def to_ne(self, lat: float, lon: float) -> NorthEast:
         return ne_between(self.lat0, self.lon0, lat, lon)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"LocalFrame({self.lat0:.7f}, {self.lon0:.7f})"

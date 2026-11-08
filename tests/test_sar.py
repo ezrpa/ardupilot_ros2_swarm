@@ -29,7 +29,7 @@ from swarm_control.core import config  # noqa: E402
 from swarm_control.mission import sar_coordination as sar  # noqa: E402
 
 try:
-    import cv2
+    import cv2  # noqa: F401  (availability probe)
     import numpy as np
     _CV = True
 except ImportError:

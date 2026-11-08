@@ -1,0 +1,8 @@
+# Lint gate (CI + local):  ruff check .
+target-version = "py310"
+extend-exclude = ["src/custom_gz/models", "logs"]
+
+[lint]
+# Pyflakes (undefined/unused names, the class of bug a module split causes)
+# and syntax errors. Style is not enforced repo-wide.
+select = ["F", "E9"]

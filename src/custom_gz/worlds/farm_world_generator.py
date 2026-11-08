@@ -4,8 +4,6 @@
 Farm World Generator Script to create world with defined number of fields and drones.
 """
 
-import os
-import math
 
 NUM_FIELDS_X = 4
 NUM_FIELDS_Y = 4
@@ -223,7 +221,7 @@ def main():
         f.write(sdf_content)
 
     print(f"Generated farm world with {NUM_FIELDS_X}x{NUM_FIELDS_Y} fields and {NUM_DRONES} drones")
-    print(f"File saved as farm_world.sdf")
+    print("File saved as farm_world.sdf")
 
 
 if __name__ == "__main__":

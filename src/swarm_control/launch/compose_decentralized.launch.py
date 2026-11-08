@@ -2,10 +2,7 @@
 import json
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, TimerAction, LogInfo, DeclareLaunchArgument, OpaqueFunction
-from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.event_handlers import OnProcessExit
-from launch.actions import RegisterEventHandler
 
 from swarm_control.core import config
 from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine

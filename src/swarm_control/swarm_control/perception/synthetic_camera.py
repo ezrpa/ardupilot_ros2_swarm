@@ -135,7 +135,6 @@ def render_frame(lat0, lon0, alt, heading, weeds=(), person=None,
     f_px = (w / 2.0) / math.tan(cp.CAMERA_HFOV_RAD / 2.0)
     m2px = f_px / alt
     psi = heading or 0.0
-    cos0 = math.cos(math.radians(lat0))
 
     def px(n, e):     # metres from the drone (north, east) -> pixel
         fwd = n * math.cos(psi) + e * math.sin(psi)

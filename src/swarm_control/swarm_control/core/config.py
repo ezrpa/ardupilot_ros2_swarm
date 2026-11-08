@@ -17,11 +17,12 @@ this module; tests/test_contracts.py checks them against it instead.
 """
 import argparse
 import sys
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 if __package__:
     from . import geo
 else:  # run as a script (e.g. /root/swarm_core/config.py in a container)
-    import geo
+    import geo  # type: ignore[no-redef,import-not-found]
 
 # ------------------------------------------------------------ field / home
 # World (0, 0) in Gazebo; every drone's GPS home in Gazebo mode; centre of
@@ -46,57 +47,58 @@ SPAWN_LAYOUTS = ("", "corners")
 # ------------------------------------------------- per-instance contract
 # `instance` is 0-based everywhere.
 
-def sysid(instance):
+def sysid(instance: int) -> int:
     """MAVLink SYSID_THISMAV."""
     return instance + 1
 
 
-def ros_domain_id(instance):
+def ros_domain_id(instance: int) -> int:
     """Each drone lives in its own ROS 2 domain (DDS_DOMAIN_ID too)."""
     return instance + 1
 
 
-def dds_udp_port(instance):
+def dds_udp_port(instance: int) -> int:
     """ArduPilot DDS client -> micro-ROS agent (DDS_UDP_PORT)."""
     return 2019 + instance
 
 
-def mavlink_tcp_port(instance):
+def mavlink_tcp_port(instance: int) -> int:
     """SITL SERIAL0 TCP: ground stations (QGroundControl)."""
     return 5760 + 10 * instance
 
 
-def serial1_tcp_port(instance):
+def serial1_tcp_port(instance: int) -> int:
     """SITL SERIAL1 TCP: SprayerDrone's MAVLink link (sprayer commands)."""
     return 5762 + 10 * instance
 
 
-def serial2_tcp_port(instance):
+def serial2_tcp_port(instance: int) -> int:
     """SITL SERIAL2 TCP: spray_visualizer (pump servo readback)."""
     return 5763 + 10 * instance
 
 
-def sitl_port(instance):
+def sitl_port(instance: int) -> int:
     """SITL base port (RC input) for this instance."""
     return 5501 + 10 * instance
 
 
-def mavproxy_udp_port(instance):
+def mavproxy_udp_port(instance: int) -> int:
     """MAVProxy UDP output for host tools (pymavlink, QGC)."""
     return 14550 + instance
 
 
-def gazebo_fdm_port(instance):
+def gazebo_fdm_port(instance: int) -> int:
     """Gazebo ArduPilotPlugin JSON FDM port baked into base_drone*/model.sdf."""
     return 9002 + 10 * instance
 
 
-def camera_udp_port(instance):
+def camera_udp_port(instance: int) -> int:
     """GstCameraPlugin H.264/RTP stream of base_drone_cam*/model.sdf."""
     return 5600 + instance
 
 
-def launch_points(n_drones, size_m=DEFAULT_SPAWN_AREA_M, inset_m=SPAWN_INSET_M):
+def launch_points(n_drones: int, size_m: float = DEFAULT_SPAWN_AREA_M,
+                  inset_m: float = SPAWN_INSET_M) -> List[Tuple[float, float]]:
     """SAR separate launch points as (north, east) metres from the field
     origin: the search square's corners (NE, SW, NW, SE), then the edge
     midpoints; instances beyond 8 wrap around."""
@@ -106,7 +108,8 @@ def launch_points(n_drones, size_m=DEFAULT_SPAWN_AREA_M, inset_m=SPAWN_INSET_M):
     return [pts[i % len(pts)] for i in range(n_drones)]
 
 
-def home_location(instance, gazebo=False, layout="", area_m=DEFAULT_SPAWN_AREA_M):
+def home_location(instance: int, gazebo: bool = False, layout: str = "",
+                  area_m: float = DEFAULT_SPAWN_AREA_M) -> Tuple[str, str]:
     """SITL --custom-location lat/lon for an instance, as the strings
     start_drone_container.sh passes on.
 
@@ -127,7 +130,8 @@ def home_location(instance, gazebo=False, layout="", area_m=DEFAULT_SPAWN_AREA_M
             f"{FIELD_ORIGIN_LON + instance * BUILTIN_SITL_SPACING_DEG:.6f}")
 
 
-def instance_env(instance, gazebo=False, layout="", area_m=DEFAULT_SPAWN_AREA_M):
+def instance_env(instance: int, gazebo: bool = False, layout: str = "",
+                 area_m: float = DEFAULT_SPAWN_AREA_M) -> Dict[str, Union[int, str]]:
     """Shell variables for one drone instance (names used by the scripts)."""
     lat, lon = home_location(instance, gazebo, layout, area_m)
     return {
@@ -145,7 +149,7 @@ def instance_env(instance, gazebo=False, layout="", area_m=DEFAULT_SPAWN_AREA_M)
     }
 
 
-def _main(argv=None):
+def _main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     env = sub.add_parser("env", help="print KEY=value lines for one instance")

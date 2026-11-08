@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import socket
-import time
 import sys
 import os
-import signal
 import argparse
 import json
 import subprocess

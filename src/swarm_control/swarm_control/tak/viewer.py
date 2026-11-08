@@ -21,7 +21,6 @@ Only stdlib + optional pytak; no ROS. Read-only: never sends CoT.
 import argparse
 import asyncio
 import json
-import math
 import os
 import re
 import socket

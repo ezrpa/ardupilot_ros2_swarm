@@ -1,0 +1,41 @@
+# Architecture contracts, checked in CI:  PYTHONPATH=src/swarm_control lint-imports
+[importlinter]
+root_package = swarm_control
+include_external_packages = True
+
+[importlinter:contract:layers]
+name = Layers: nodes -> (tak | perception | mission) -> core
+type = layers
+layers =
+    swarm_control.nodes
+    swarm_control.tak | swarm_control.perception | swarm_control.mission
+    swarm_control.core
+
+[importlinter:contract:ros-only-in-nodes]
+name = Only swarm_control.nodes may import ROS
+type = forbidden
+source_modules =
+    swarm_control.core
+    swarm_control.mission
+    swarm_control.perception
+    swarm_control.tak
+forbidden_modules =
+    rclpy
+    ardupilot_msgs
+    geographic_msgs
+    geometry_msgs
+    sensor_msgs
+    std_msgs
+    launch
+    launch_ros
+
+[importlinter:contract:core-is-stdlib]
+name = core is stdlib-only (runs standalone in the ArduPilot container)
+type = forbidden
+source_modules =
+    swarm_control.core
+forbidden_modules =
+    numpy
+    cv2
+    pymavlink
+    pytak

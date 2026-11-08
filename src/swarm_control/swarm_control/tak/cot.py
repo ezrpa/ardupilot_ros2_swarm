@@ -34,7 +34,7 @@ import ssl
 import threading
 import time
 import uuid as _uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 from xml.sax.saxutils import quoteattr, escape
 
