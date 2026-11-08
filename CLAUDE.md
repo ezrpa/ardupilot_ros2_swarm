@@ -173,6 +173,28 @@ ellipsoidal: AMSL + `TAK_GEOID_OFFSET` (default −17 m at the field origin).
 Certs go in `./tak` (gitignored, mounted at `/root/tak`). AFSIM pairing
 (DIS gateway, LVC split) is a design only — see `docs/TAK.md`.
 
+### Search & Rescue Mission (`docs/SAR.md`)
+```bash
+SWARM_WORLD=swarm_drone_sar.sdf ./start_gazebo.sh &
+SWARM_MISSION=sar TAK_URL="udp://239.2.3.1:6969" USE_GAZEBO=1 ./start_swarm.sh 4
+python3 src/swarm_control/tests/test_sar.py   # 4-drone mission, ROS stubbed
+```
+`SWARM_MISSION=sar` (compose env) switches `start_swarm_controller.sh` to
+`sar_mission.launch.py`: `SearchDrone(BaseDrone)` nodes split a 120 m square
+(7x7 grid, 30 m) and detect the hi-vis orange `missing_person` model
+(`camera_processor.PERSON_*`, H 0–14 high-S — clear of the farm palette and
+magenta weeds; `CameraProcessor(detectors=...)` now writes one
+`<name>_detections` list per detector). On a sighting the drone descends to
+15 m to CONFIRM, then raises THE call: `logs/sar/call.json` created with
+`O_EXCL` (first caller wins). Every drone polls it every 0.5 s, aborts its
+strip, and flies its own slot from `sar_coordination.rally_slot` (finder
+overhead, others on a 15 m ring at 35/40/45 m); `on_scene` is judged by GPS.
+Drones that finish without a find hover and listen until all others report
+done (`standby_timeout`). The TAK bridge (`--mission sar`) relays the call as
+a `b-r-f-h-c` CASEVAC point + ONE GeoChat broadcast. The person model carries
+its own world pose — the world `<include>` must NOT set `<pose>` (it would
+replace it). Regenerate: `generate_missing_person.py --seed N`.
+
 ### Stopping the Swarm
 ```bash
 ./stop_swarm.sh

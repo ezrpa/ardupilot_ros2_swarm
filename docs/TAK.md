@@ -52,6 +52,10 @@ best-effort, so a missing/unreachable TAK server never affects a mission.
 | Spray targets `S<id>-T<k>` | `b-m-p-s-m`, one colour per sprayer | `logs/prescriptions/sprayer_<i>.json` | replace the raw detections (sent `t-x-d-d` deletes) once the plan lands; linked to their sprayer |
 | `SURVEY FIELD` | `u-d-r` rectangle | field origin ± 40 m | remarks carry progress: frames, detections, targets |
 
+In the search-and-rescue mission (`SWARM_MISSION=sar`, see
+[`SAR.md`](SAR.md)) the drones are `SEARCH-<id>`, and the call is relayed as a
+`SURVIVOR` CASEVAC point (`b-r-f-h-c`) plus one GeoChat broadcast (`b-t-f`).
+
 Static items are re-broadcast every 30 s so EUDs that join late (multicast has
 no server-side history) still get them.
 

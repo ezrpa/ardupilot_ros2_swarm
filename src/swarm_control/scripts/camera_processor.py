@@ -5,7 +5,7 @@ Each drone model streams H.264/RTP over UDP via GstCameraPlugin on port
 5600 + instance (see src/custom_gz/models/base_drone*/model.sdf). This module
 decodes that stream with OpenCV's GStreamer backend and provides
 waypoint-triggered, geotagged frame capture plus ArUco marker detection and
-weed detection.
+colour-blob detection (magenta weeds; hi-vis orange person for SAR).
 
 Design constraints:
  - MUST be non-fatal: a missing camera, cv2, or GStreamer support must never
@@ -35,12 +35,77 @@ WEED_HSV_LOW = (140, 100, 80)
 WEED_HSV_HIGH = (170, 255, 255)
 WEED_MIN_AREA_PX = 50
 
+# Search & rescue: the missing person (model missing_person) wears a hi-vis
+# orange coverall. Orange sits at OpenCV H ~10; the band is kept below the
+# farm textures' soil/wheat/sunflower hues (H 15-24) and demands high
+# saturation, which those textures lack. A 1.5 x 0.45 m figure is ~160 px at
+# 30 m AGL (6.4 cm/px), so 40 px still rejects speckle.
+PERSON_HSV_LOW = (0, 180, 120)
+PERSON_HSV_HIGH = (14, 255, 255)
+PERSON_MIN_AREA_PX = 40
+
+# name -> (hsv_low, hsv_high, min_area_px). Each lands in the sidecar as
+# "<name>_detections".
+DEFAULT_DETECTORS = {"weed": (WEED_HSV_LOW, WEED_HSV_HIGH, WEED_MIN_AREA_PX)}
+PERSON_DETECTORS = {"person": (PERSON_HSV_LOW, PERSON_HSV_HIGH,
+                               PERSON_MIN_AREA_PX)}
+
+
+def detect_color_blobs(frame, hsv_low, hsv_high, min_area_px,
+                       lat=None, lon=None, alt=None):
+    """Find blobs inside an HSV band; returns [{'centroid_px', 'bbox',
+    'area_px', 'lat', 'lon'}]. lat/lon are georeferenced from the drone pose
+    assuming a north-aligned nadir camera (approximate - vehicle yaw is not
+    compensated), or None when the pose is unknown. Never raises."""
+    if not _CV2_OK:
+        return []
+    try:
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, hsv_low, hsv_high)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        contours, _ = cv2.findContours(
+            mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        h, w = frame.shape[:2]
+        f_px = (w / 2.0) / math.tan(CAMERA_HFOV_RAD / 2.0)
+        detections = []
+        for c in contours:
+            area = cv2.contourArea(c)
+            if area < min_area_px:
+                continue
+            bx, by, bw, bh = cv2.boundingRect(c)
+            cx = bx + bw / 2.0
+            cy = by + bh / 2.0
+            det = {
+                "centroid_px": [cx, cy],
+                "bbox": [bx, by, bw, bh],
+                "area_px": area,
+                "lat": None,
+                "lon": None,
+            }
+            if lat is not None and lon is not None and alt is not None:
+                east = (cx - w / 2.0) / f_px * alt
+                north = -(cy - h / 2.0) / f_px * alt
+                det["lat"] = lat + north / 111111.0
+                det["lon"] = lon + east / (
+                    111111.0 * math.cos(math.radians(lat)))
+            detections.append(det)
+        return detections
+    except Exception:
+        return []
+
 
 class CameraProcessor:
     """Grabs frames from a GstCameraPlugin UDP stream and geotags them."""
 
-    def __init__(self, drone_id, udp_port, out_dir="/root/logs", logger=None):
+    def __init__(self, drone_id, udp_port, out_dir="/root/logs", logger=None,
+                 detectors=None):
         self.drone_id = drone_id
+        self.detectors = dict(DEFAULT_DETECTORS if detectors is None
+                              else detectors)
+        self.last_meta = None  # sidecar dict of the most recent capture
         self.udp_port = udp_port
         self.out_dir = os.path.join(out_dir, f"drone_{drone_id}")
         self._log = logger
@@ -112,26 +177,30 @@ class CameraProcessor:
                 time.sleep(0.05)
 
     # --------------------------------------------------------------- capture
-    def capture(self, wp_index, lat=None, lon=None, alt=None, extra=None):
-        """Save the freshest frame as wp_<n>.jpg with a JSON geotag sidecar.
-
-        Also runs ArUco detection on the frame; detections land in the
-        sidecar so downstream tooling can georeference targets.
-        Returns the image path, or None if no frame was available.
+    def capture(self, wp_index, lat=None, lon=None, alt=None, extra=None,
+                prefix="wp"):
+        """Save the freshest frame as <prefix>_<n>.jpg with a JSON geotag
+        sidecar (ArUco + one "<name>_detections" list per configured
+        detector). Returns the image path, or None if no frame was available;
+        the sidecar dict is also kept in self.last_meta.
         """
+        self.last_meta = None
         if not self.active:
             return None
 
         with self._lock:
             frame = None if self._latest_frame is None else self._latest_frame.copy()
         if frame is None:
-            self._warn(f"wp {wp_index}: no frame received yet")
+            self._warn(f"{prefix} {wp_index}: no frame received yet")
             return None
 
         detections = self._detect_aruco(frame)
-        weeds = self._detect_weeds(frame, lat=lat, lon=lon, alt=alt)
+        found = {name: detect_color_blobs(frame, lo, hi, min_area,
+                                          lat=lat, lon=lon, alt=alt)
+                 for name, (lo, hi, min_area) in self.detectors.items()}
 
-        img_path = os.path.join(self.out_dir, f"wp_{wp_index:03d}.jpg")
+        stem = f"{prefix}_{wp_index:03d}"
+        img_path = os.path.join(self.out_dir, f"{stem}.jpg")
         cv2.imwrite(img_path, frame)
 
         meta = {
@@ -142,17 +211,19 @@ class CameraProcessor:
             "alt": alt,
             "unix_time": time.time(),
             "aruco_detections": detections,
-            "weed_detections": weeds,
         }
+        for name, dets in found.items():
+            meta[f"{name}_detections"] = dets
         if extra:
             meta.update(extra)
-        with open(os.path.join(self.out_dir, f"wp_{wp_index:03d}.json"), "w") as f:
+        with open(os.path.join(self.out_dir, f"{stem}.json"), "w") as f:
             json.dump(meta, f, indent=2)
+        self.last_meta = meta
 
         self._info(
-            f"wp {wp_index}: saved {os.path.basename(img_path)}"
+            f"{stem}: saved {os.path.basename(img_path)}"
             + (f" ({len(detections)} aruco)" if detections else "")
-            + (f" ({len(weeds)} weeds)" if weeds else ""))
+            + "".join(f" ({len(d)} {n})" for n, d in found.items() if d))
         return img_path
 
     def _detect_aruco(self, frame):
@@ -175,46 +246,15 @@ class CameraProcessor:
         ]
 
     def _detect_weeds(self, frame, lat=None, lon=None, alt=None):
-        """Detect magenta weed blobs; returns [{'centroid_px', 'bbox',
-        'area_px', 'lat', 'lon'}]. lat/lon are georeferenced from the drone
-        pose assuming a north-aligned nadir camera (approximate — vehicle yaw
-        is not compensated), or None when the pose is unknown."""
-        try:
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            mask = cv2.inRange(hsv, WEED_HSV_LOW, WEED_HSV_HIGH)
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-            contours, _ = cv2.findContours(
-                mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        """Detect magenta weed blobs (see detect_color_blobs)."""
+        return detect_color_blobs(frame, WEED_HSV_LOW, WEED_HSV_HIGH,
+                                  WEED_MIN_AREA_PX, lat=lat, lon=lon, alt=alt)
 
-            h, w = frame.shape[:2]
-            f_px = (w / 2.0) / math.tan(CAMERA_HFOV_RAD / 2.0)
-            detections = []
-            for c in contours:
-                area = cv2.contourArea(c)
-                if area < WEED_MIN_AREA_PX:
-                    continue
-                bx, by, bw, bh = cv2.boundingRect(c)
-                cx = bx + bw / 2.0
-                cy = by + bh / 2.0
-                det = {
-                    "centroid_px": [cx, cy],
-                    "bbox": [bx, by, bw, bh],
-                    "area_px": area,
-                    "lat": None,
-                    "lon": None,
-                }
-                if lat is not None and lon is not None and alt is not None:
-                    east = (cx - w / 2.0) / f_px * alt
-                    north = -(cy - h / 2.0) / f_px * alt
-                    det["lat"] = lat + north / 111111.0
-                    det["lon"] = lon + east / (
-                        111111.0 * math.cos(math.radians(lat)))
-                detections.append(det)
-            return detections
-        except Exception:
-            return []
+    def _detect_person(self, frame, lat=None, lon=None, alt=None):
+        """Detect the hi-vis orange missing person (see detect_color_blobs)."""
+        return detect_color_blobs(frame, PERSON_HSV_LOW, PERSON_HSV_HIGH,
+                                  PERSON_MIN_AREA_PX, lat=lat, lon=lon,
+                                  alt=alt)
 
     # ---------------------------------------------------------------- close
     def close(self):

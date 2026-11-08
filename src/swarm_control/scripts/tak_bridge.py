@@ -23,6 +23,15 @@ produces — no changes to the drone nodes:
     the EUDs and replaced by the clustered targets, colour-coded per sprayer.
   * FIELD BOUNDARY: the surveyed rectangle, with mission progress in remarks.
 
+  --mission sar (search and rescue, sar_mission.launch.py):
+  * Drones are SEARCH-<id>; remarks carry each drone's SAR state
+    (searching wp k/n, confirming, converging 23 m out, on scene...).
+  * THE CALL (logs/sar/call.json, raised by the drone that confirms the
+    missing person): a CASEVAC point (b-r-f-h-c) at the survivor, linked to
+    the finder, plus ONE GeoChat broadcast to All Chat Rooms so every
+    operator is paged at the same moment the drones are.
+  * Search-area rectangle with coverage / call / responders-on-scene status.
+
 Static items (markers, field) are re-broadcast every --static-period s so
 late-joining EUDs on multicast still receive them.
 
@@ -43,12 +52,14 @@ import time
 
 try:
     from tak_cot import (CotSender, drone_event, spot_event, rectangle_event,
-                         delete_event, ne_to_latlon, course_speed, MAGENTA,
+                         delete_event, casevac_event, chat_event,
+                         ne_to_latlon, course_speed, MAGENTA,
                          SPRAYER_PALETTE)
 except ImportError:  # installed as the `scripts` python package
     from scripts.tak_cot import (CotSender, drone_event, spot_event,
-                                 rectangle_event, delete_event, ne_to_latlon,
-                                 course_speed, MAGENTA, SPRAYER_PALETTE)
+                                 rectangle_event, delete_event, casevac_event,
+                                 chat_event, ne_to_latlon, course_speed,
+                                 MAGENTA, SPRAYER_PALETTE)
 
 # Must match compose_decentralized.launch.py / start_drone_container.sh
 FIELD_ORIGIN_LAT = 40.072842
@@ -72,7 +83,9 @@ class SwarmTakBridge:
     def __init__(self, instances, sprayers=(), logs_dir="/root/logs",
                  uid_prefix="ardupilot-swarm", geoid_offset=DEFAULT_GEOID_OFFSET,
                  field_half_m=40.0, video_url=None, replace_detections=True,
-                 origin=(FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON)):
+                 origin=(FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON),
+                 mission="survey"):
+        self.mission = mission
         self.instances = list(instances)
         self.sprayers = set(sprayers)
         self.logs_dir = logs_dir
@@ -91,9 +104,15 @@ class SwarmTakBridge:
         self._frames = 0
         self._plan_ready = False
         self._field_dirty = True
+        # SAR state (mission == "sar")
+        self.sar_call = None
+        self.sar_status = {}       # instance -> status dict
+        self._sar_mtime = {}
 
     # --------------------------------------------------------- identity
     def role(self, inst):
+        if self.mission == "sar":
+            return "search"
         return "sprayer" if inst in self.sprayers else "mapper"
 
     def callsign(self, inst):
@@ -164,8 +183,11 @@ class SwarmTakBridge:
                     parts.append(f"{amsl - d['home_amsl']:.1f} m AGL")
                 if "speed" in d:
                     parts.append(f"{d['speed']:.1f} m/s")
+                st = self.sar_status.get(inst)
+                if st:
+                    parts.append(self._sar_state_text(st))
                 video = None
-                if self.video_url and self.role(inst) == "mapper":
+                if self.video_url and self.role(inst) in ("mapper", "search"):
                     video = self.video_url.format(instance=inst, id=inst + 1)
                 out.append(drone_event(
                     self.drone_uid(inst), self.callsign(inst), lat, lon,
@@ -181,7 +203,42 @@ class SwarmTakBridge:
         return [ne_to_latlon(lat0, lon0, n, e)
                 for n, e in ((h, -h), (h, h), (-h, h), (-h, -h))]
 
+    @staticmethod
+    def _sar_state_text(st):
+        state = st.get("state", "?")
+        if state == "searching" and "wp" in st:
+            return f"SAR: searching wp {st['wp']}/{st.get('of', '?')}"
+        if state == "converging" and "distance_m" in st:
+            return f"SAR: converging, {st['distance_m']:.0f} m out"
+        if state == "on_scene":
+            return "SAR: ON SCENE" + (" (finder)" if st.get("finder") else "")
+        return f"SAR: {state.replace('_', ' ')}"
+
+    def _sar_field_status(self):
+        done = sum(min(st.get("wp", 0), st.get("of", 0))
+                   for st in self.sar_status.values()
+                   if st.get("state") in ("searching", "search_complete"))
+        total = sum(st.get("of", 0) for st in self.sar_status.values())
+        if not self.sar_call:
+            if self.sar_status and all(
+                    st.get("state") in ("search_complete", "returning")
+                    for st in self.sar_status.values()):
+                return "search complete - person NOT found"
+            return f"searching: {done}/{total or '?'} waypoints"
+        on_scene = sum(st.get("state") == "on_scene"
+                       for st in self.sar_status.values())
+        c = self.sar_call
+        return (f"PERSON FOUND by SEARCH-{c.get('found_by_id')} at "
+                f"{c['lat']:.6f}, {c['lon']:.6f} | {on_scene}/"
+                f"{len(self.instances)} drones on scene")
+
     def field_event(self, now=None):
+        if self.mission == "sar":
+            return rectangle_event(
+                f"{self.prefix}-field", "SEARCH AREA", self.field_corners(),
+                remarks=f"{2 * self.field_half:.0f}x{2 * self.field_half:.0f}"
+                        f" m search area | {self._sar_field_status()}",
+                now=now)
         if self._plan_ready:
             status = f"plan ready: {len(self.targets)} spray targets"
         else:
@@ -195,6 +252,8 @@ class SwarmTakBridge:
     def static_events(self, now=None):
         """Everything that must survive late EUD joins (re-broadcast)."""
         out = [self.field_event(now)]
+        if self.sar_call:
+            out.append(self._casevac(now))
         with self._lock:
             items = (list(self.targets.items()) if self._plan_ready
                      else list(self.detections.items()))
@@ -206,11 +265,64 @@ class SwarmTakBridge:
     def scan_artifacts(self, now=None):
         """Pick up new sidecars / prescriptions. Returns CoT to send now."""
         out = []
-        out += self._scan_sidecars(now)
-        out += self._scan_prescriptions(now)
+        if self.mission == "sar":
+            out += self._scan_sar(now)
+        else:
+            out += self._scan_sidecars(now)
+            out += self._scan_prescriptions(now)
         if self._field_dirty:
             out.append(self.field_event(now))
             self._field_dirty = False
+        return out
+
+    # ------------------------------------------------------------- SAR
+    def _casevac(self, now=None):
+        c = self.sar_call
+        finder = c.get("found_by_instance")
+        return casevac_event(
+            f"{self.prefix}-sar-casualty", "SURVIVOR", c["lat"], c["lon"],
+            parent_uid=self.drone_uid(finder) if finder is not None else None,
+            remarks=f"Missing person CONFIRMED by SEARCH-{c.get('found_by_id')}"
+                    f" from {c.get('confirm_alt', '?')} m AGL "
+                    f"({c.get('area_px', 0):.0f} px, nadir georef). "
+                    f"Image: {c.get('image', 'n/a')}", now=now)
+
+    def _read_json_if_changed(self, path):
+        try:
+            m = os.path.getmtime(path)
+        except OSError:
+            return None
+        if self._sar_mtime.get(path) == m:
+            return None
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None  # mid-write; retry next scan
+        self._sar_mtime[path] = m
+        return data
+
+    def _scan_sar(self, now):
+        out = []
+        sar_dir = os.path.join(self.logs_dir, "sar")
+        for path in glob.glob(os.path.join(sar_dir, "status_*.json")):
+            st = self._read_json_if_changed(path)
+            if st is not None and "instance" in st:
+                with self._lock:
+                    self.sar_status[int(st["instance"])] = st
+                self._field_dirty = True
+        call = self._read_json_if_changed(os.path.join(sar_dir, "call.json"))
+        if call is not None and "lat" in call and self.sar_call is None:
+            self.sar_call = call
+            self._field_dirty = True
+            out.append(self._casevac(now))
+            finder = call.get("found_by_instance", 0)
+            out.append(chat_event(
+                self.drone_uid(finder), f"SEARCH-{call.get('found_by_id')}",
+                f"SURVIVOR FOUND by SEARCH-{call.get('found_by_id')} at "
+                f"{call['lat']:.6f}, {call['lon']:.6f}. All search drones "
+                f"converging. CASEVAC point 'SURVIVOR' dropped.",
+                call["lat"], call["lon"], now=now))
         return out
 
     def _scan_sidecars(self, now):
@@ -401,6 +513,8 @@ def parse_args(argv=None):
     ap.add_argument("--key-password", default=_env("TAK_KEY_PASSWORD"))
     ap.add_argument("--ca", default=_env("TAK_CA"),
                     help="TAK Server CA PEM; omit = encrypt without verifying")
+    ap.add_argument("--mission", choices=("survey", "sar"),
+                    default=_env("SWARM_MISSION", "survey"))
     ap.add_argument("--no-telemetry", action="store_true",
                     help="skip ROS/DDS drone tracks (artifacts only)")
     args = ap.parse_args(argv)
@@ -422,7 +536,7 @@ def main(argv=None):
         args.instances, args.sprayers, logs_dir=args.logs,
         uid_prefix=args.uid_prefix, geoid_offset=args.geoid_offset,
         field_half_m=args.field_half, video_url=args.video_url,
-        replace_detections=not args.keep_detections)
+        replace_detections=not args.keep_detections, mission=args.mission)
 
     def send_all(events):
         for xml in events:
@@ -436,7 +550,8 @@ def main(argv=None):
             log(f"[tak] drone telemetry unavailable ({e}); "
                 f"publishing mission artifacts only")
 
-    log(f"[tak] bridge up: sinks={args.url} instances={args.instances} "
+    log(f"[tak] bridge up ({args.mission}): sinks={args.url} "
+        f"instances={args.instances} "
         f"sprayers={args.sprayers} logs={args.logs}")
     next_scan = next_static = 0.0
     period = 1.0 / max(args.rate, 0.1)

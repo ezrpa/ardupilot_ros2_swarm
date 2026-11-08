@@ -43,6 +43,9 @@ TYPE_UAV_ROTARY = "a-f-A-M-F-Q-r"   # friendly / air / military / UAV, rotary
 TYPE_SPOT_MAP = "b-m-p-s-m"         # spot-map marker (user-placeable point)
 TYPE_RECTANGLE = "u-d-r"            # drawing: rectangle
 TYPE_DELETE = "t-x-d-d"             # tasking: delete the linked uid
+TYPE_CASEVAC = "b-r-f-h-c"          # CASEVAC / MEDEVAC request point
+TYPE_CHAT = "b-t-f"                 # GeoChat message
+CHAT_ALL = "All Chat Rooms"         # ATAK's broadcast chatroom
 
 # ARGB colours as signed 32-bit ints (the encoding TAK uses in XML)
 def argb(a, r, g, b):
@@ -154,6 +157,38 @@ def rectangle_event(uid, callsign, corners, stroke=GREEN, fill=GREEN_FILL,
         d.append(f"<remarks>{escape(remarks)}</remarks>")
     return event(uid, TYPE_RECTANGLE, clat, clon, hae=0.0, stale_s=stale_s,
                  how="h-e", detail="".join(d), now=now)
+
+
+def casevac_event(uid, callsign, lat, lon, remarks="", parent_uid=None,
+                  stale_s=86400.0, now=None):
+    """CASEVAC point at a casualty: ATAK draws the MEDEVAC icon and the
+    operator can open it to fill the 9-line from there. Only contact,
+    remarks and link are set - the 9-line fields are left to the human."""
+    d = [f"<contact {_attrs(callsign=callsign)}/>"]
+    if parent_uid:
+        d.append(f"<link {_attrs(uid=parent_uid, relation='p-p', type=TYPE_UAV_ROTARY)}/>")
+    d.append("<archive/>")
+    if remarks:
+        d.append(f"<remarks>{escape(remarks)}</remarks>")
+    return event(uid, TYPE_CASEVAC, lat, lon, hae=0.0, ce=5.0,
+                 stale_s=stale_s, how="h-g-i-g-o", detail="".join(d), now=now)
+
+
+def chat_event(sender_uid, sender_callsign, message, lat, lon,
+               chatroom=CHAT_ALL, message_id=None, now=None):
+    """GeoChat message (default: broadcast to All Chat Rooms), as ATAK
+    itself sends it. Used to page every operator when the call goes out."""
+    now = time.time() if now is None else now
+    mid = message_id or str(_uuid.uuid4())
+    uid = f"GeoChat.{sender_uid}.{chatroom}.{mid}"
+    d = (f"<__chat {_attrs(parent='RootContactGroup', groupOwner='false', messageId=mid, chatroom=chatroom, id=chatroom, senderCallsign=sender_callsign)}>"
+         f"<chatgrp {_attrs(uid0=sender_uid, uid1=chatroom, id=chatroom)}/>"
+         "</__chat>"
+         f"<link {_attrs(uid=sender_uid, type=TYPE_UAV_ROTARY, relation='p-p')}/>"
+         f"<remarks {_attrs(source=f'BAO.F.ATAK.{sender_uid}', to=chatroom, time=cot_time(now))}>"
+         f"{escape(message)}</remarks>")
+    return event(uid, TYPE_CHAT, lat, lon, stale_s=86400.0, how="h-g-i-g-o",
+                 detail=d, now=now)
 
 
 def delete_event(target_uid, target_type=TYPE_SPOT_MAP, now=None):

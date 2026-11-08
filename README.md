@@ -53,6 +53,10 @@ video port).
   Cursor-on-Target feed of drone tracks, live weed detections, per-sprayer
   spray targets and the survey field to ATAK/WinTAK/TAK Server (multicast,
   TCP or mutual TLS). AFSIM pairing design in [`docs/TAK.md`](docs/TAK.md)
+- **Search & rescue mission** (`SWARM_MISSION=sar`): drones search a 120 m
+  area for a missing person; the first to confirm a sighting calls the rest,
+  which converge on the survivor while TAK gets a CASEVAC point and a GeoChat
+  page. See [`docs/SAR.md`](docs/SAR.md)
 - **Self-healing startup**: nodes respawn through EKF/GPS warmup races;
   arming/mode timeouts sized for multi-SITL contention
 
@@ -93,6 +97,10 @@ video port).
 | `src/swarm_control/scripts/tak_bridge.py` / `tak_cot.py` | TAK bridge (DDS + mission logs → CoT) and stdlib CoT encoder/transports |
 | `src/swarm_control/tests/test_points_distributor.py` | Splitter balance/coverage tests |
 | `src/swarm_control/tests/test_tak_bridge.py` | CoT schema, bridge pipeline, UDP/file sender tests |
+| `src/swarm_control/scripts/search_drone_dds.py` / `sar_coordination.py` | SAR drone node; call channel + rally geometry |
+| `src/swarm_control/launch/sar_mission.launch.py` | SAR mission launch (`SWARM_MISSION=sar`) |
+| `src/custom_gz/worlds/swarm_drone_sar.sdf` / `generate_missing_person.py` | SAR world and missing-person generator |
+| `src/swarm_control/tests/test_sar.py` | SAR tests incl. a 4-drone end-to-end mission with ROS stubbed |
 
 ## Roadmap (toward the STTR architecture)
 
