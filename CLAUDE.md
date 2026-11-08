@@ -309,8 +309,9 @@ Authoritative source is `src/scripts/start_drone_container.sh` (`INSTANCE` is 0-
 - ROS_DOMAIN_ID:           `INSTANCE + 1`  (domain isolation per drone)
 - SYSID_THISMAV:           `INSTANCE + 1`
 
-Note: `check_swarm_status.sh` computes the MAVProxy port as `14550 + (i-1)*10` with a
-1-indexed loop — a known inconsistency with the per-instance formula above.
+`check_swarm_status.sh N` checks real health: a MAVLink HEARTBEAT on UDP `14550+i`
+(reports BUSY if QGroundControl holds the port) and `ros2 node list` in each drone's
+domain `i+1`.
 
 ## Critical Implementation Details
 

@@ -1,93 +1,82 @@
 #!/bin/bash
-
-# Swarm Status Check Script
-# Run this script from the host to check swarm status
+# Swarm status check, run from the host:  ./src/scripts/check_swarm_status.sh [NUM_DRONES]
+#
+# Checks what actually indicates health (instance i = 0..N-1, per
+# start_drone_container.sh):
+#   * MAVLink: a HEARTBEAT on MAVProxy's UDP output 14550+i (mode, armed).
+#     MAVProxy pushes UDP; a TCP probe of that port is always "closed", which
+#     is why the old version of this script reported healthy drones as failed.
+#   * ROS 2: nodes in the drone's own domain, ROS_DOMAIN_ID = i+1.
+#     The default domain 0 is empty by design.
 
 NUM_DRONES=${1:-4}
-
-echo "=== ArduPilot Swarm Status Check ==="
-echo "Checking $NUM_DRONES drones..."
-echo ""
-
-# Check Docker containers
-echo "=== Container Status ==="
-if command -v docker &> /dev/null; then
-    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "(drone|swarm|ros2)"
-else
-    echo "Docker not available"
+if ! [[ "$NUM_DRONES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "usage: $0 [NUM_DRONES]   (positive integer, default 4)" >&2
+    exit 2
 fi
-echo ""
 
-# Check ports
-echo "=== Port Status ==="
-for i in $(seq 1 $NUM_DRONES); do
-    MAVLINK_PORT=$((14550 + (i-1) * 10))
-    ROS_PORT=$((14551 + (i-1) * 10))
+echo "=== ArduPilot Swarm Status: $NUM_DRONES drones ==="
+echo
 
-    if nc -z localhost $MAVLINK_PORT 2>/dev/null; then
-        MAVLINK_STATUS="✓"
-    else
-        MAVLINK_STATUS="✗"
-    fi
+echo "=== Containers ==="
+if command -v docker &>/dev/null; then
+    docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "NAMES|drone|swarm|discovery|micro-ros"
+else
+    echo "docker not available"
+fi
+echo
 
-    if nc -z localhost $ROS_PORT 2>/dev/null; then
-        ROS_STATUS="✓"
-    else
-        ROS_STATUS="✗"
-    fi
-
-    echo "Drone $i: MAVLink $MAVLINK_PORT $MAVLINK_STATUS | ROS $ROS_PORT $ROS_STATUS"
+echo "=== MAVLink heartbeat (UDP 14550+i, 3 s each) ==="
+for i in $(seq 0 $((NUM_DRONES - 1))); do
+    port=$((14550 + i))
+    python3 - "$i" "$port" <<'PY'
+import sys
+inst, port = int(sys.argv[1]), int(sys.argv[2])
+label = f"instance {inst} (UDP {port})"
+try:
+    from pymavlink import mavutil
+except ImportError:
+    print(f"{label}: SKIP - pymavlink not installed (pip install pymavlink)")
+    sys.exit(0)
+try:
+    m = mavutil.mavlink_connection(f"udpin:0.0.0.0:{port}")
+except OSError as e:
+    print(f"{label}: BUSY - port held by another listener (QGroundControl?): {e.strerror}")
+    sys.exit(0)
+hb = m.recv_match(type="HEARTBEAT", blocking=True, timeout=3)
+if hb is None:
+    print(f"{label}: NO HEARTBEAT")
+else:
+    armed = bool(hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+    mode = mavutil.mode_string_v10(hb)
+    print(f"{label}: OK  sysid={m.target_system} mode={mode} armed={armed}")
+PY
 done
-echo ""
+echo
 
-# Check ROS2 topics (if possible)
-echo "=== ROS2 Status ==="
-if docker exec swarm_controller bash -c "source /opt/ros/humble/setup.bash && timeout 5 ros2 topic list" 2>/dev/null | grep -q "/"; then
-    echo "ROS2 topics available:"
-    docker exec swarm_controller bash -c "source /opt/ros/humble/setup.bash && timeout 5 ros2 topic list" 2>/dev/null | grep -E "(drone|swarm)" | head -10
-
-    echo ""
-    echo "ROS2 nodes:"
-    docker exec swarm_controller bash -c "source /opt/ros/humble/setup.bash && timeout 5 ros2 node list" 2>/dev/null | grep -E "(drone|swarm)" | head -10
+echo "=== ROS 2 nodes per drone domain (ROS_DOMAIN_ID = i+1) ==="
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx swarm_controller; then
+    for i in $(seq 0 $((NUM_DRONES - 1))); do
+        nodes=$(docker exec swarm_controller bash -c \
+            "source /opt/ros/humble/setup.bash && ROS_DOMAIN_ID=$((i + 1)) timeout 6 ros2 node list" 2>/dev/null \
+            | tr '\n' ' ')
+        echo "instance $i (domain $((i + 1))): ${nodes:-NO NODES}"
+    done
 else
-    echo "ROS2 not accessible or no topics found"
+    echo "swarm_controller not running"
 fi
-echo ""
+echo
 
-# Check logs for errors
-echo "=== Recent Errors ==="
-echo "Checking recent container logs for errors..."
-
-if docker logs swarm_controller --tail=20 2>/dev/null | grep -i error | tail -3; then
-    echo "(Errors found in swarm_controller logs)"
-else
-    echo "No recent errors in swarm_controller"
-fi
-
-if docker compose -f compose.yaml logs drone --tail=50 2>/dev/null | grep -i error | head -3; then
-    echo "(Errors found in drone logs)"
-else
-    echo "No recent errors in drone containers"
-fi
-echo ""
-
-# Connection test
-echo "=== Connection Test ==="
-echo "Testing MAVLink connections..."
-for i in $(seq 1 $NUM_DRONES); do
-    PORT=$((14550 + (i-1) * 10))
-    if timeout 3 bash -c "</dev/tcp/127.0.0.1/$PORT" 2>/dev/null; then
-        echo "Drone $i: Connection OK"
-    else
-        echo "Drone $i: Connection FAILED"
-    fi
+echo "=== Recent errors ==="
+docker logs swarm_controller --tail=50 2>&1 | grep -i error | tail -3 || true
+for i in $(seq 0 $((NUM_DRONES - 1))); do
+    docker logs "drone-ardu-$i" --tail=50 2>&1 | grep -i error | tail -2 | sed "s/^/drone-ardu-$i: /"
 done
-echo ""
+echo
 
-echo "=== Useful Commands ==="
-echo "View all logs:           docker compose -f compose.yaml logs -f"
-echo "View controller logs:    docker compose -f compose.yaml logs -f swarm_controller"
-echo "View drone logs:         docker compose -f compose.yaml logs -f drone"
-echo "Enter controller:        docker exec -it swarm_controller bash"
-echo "Stop swarm:              docker compose -f compose.yaml down"
-echo "Restart swarm:           bash start_swarm.sh -n $NUM_DRONES"
+echo "=== Useful commands ==="
+echo "Controller logs:  docker logs -f swarm_controller"
+echo "Drone logs:       docker logs -f drone-ardu-<i>"
+echo "Enter controller: docker exec -it swarm_controller bash"
+echo "Stop swarm:       ./stop_swarm.sh"
+echo "Restart swarm:    ./start_swarm.sh $NUM_DRONES"
