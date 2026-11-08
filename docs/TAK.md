@@ -32,6 +32,38 @@ SWARM_MISSION=survey ./start_tak_sim.sh 4  # weed survey (wired, not yet run end
 
 ![TAK sim: SAR mission, all units on scene](images/tak_sim_sar.jpg)
 
+**SAR in the TAK sim** (defaults set by `start_tak_sim.sh`):
+
+- *Separate launch points* (`SPAWN_LAYOUT=corners`): drone i homes at a corner
+  of the 120 m area (inset 8 m), then edge midpoints
+  (`start_drone_container.sh`, matching `sar_search.launch_points`).
+- *Coordinated grid search* (`SAR_SEARCH=bfs|dfs|strips`, `sar_search.py`):
+  7x7 cells of ~17 m. **bfs**: from its current cell each drone takes the
+  nearest unclaimed cell (breadth-first over the 4-connected grid, ties keep
+  heading), so the fronts sweep inward from the corners. **dfs**: depth-first
+  from the launch cell, backtracking over its own stack. Cells are claimed
+  with O_EXCL files in `logs/sar/claims/`, so no cell is searched twice. The
+  bridge sends each claimed cell as a CoT rectangle in the drone's colour.
+- *Computer vision* (`camera_processor.detect_person`): a wide hi-vis HSV mask
+  finds candidates. Each blob is then measured in metres (GSD = AGL / focal px)
+  and scored as a person lying down (length about 1.6 m, width about 0.75 m
+  with arms, solidity). Blobs cut by the frame edge are rejected, because a
+  clipped kayak can look exactly person-sized. Detections carry
+  `confidence`, `length_m` and `width_m`. Rejections go to the sidecar's
+  `person_rejected` with a reason. A sighting must be re-detected from 15 m
+  before the call.
+- *Harder imagery* (`SIM_SCENARIO=sar_scenario`, `SIM_REALISM=1`):
+  `models/sar_scenario/ground_truth.json` holds the casualty (seed 33,
+  mid-field) and orange decoys (3 cones, a tarp, a kayak, a backpack). The
+  renderer adds ground texture, tree shadows, an articulated casualty,
+  exposure changes, blur and sensor noise. The Gazebo worlds are untouched.
+  Bench: person found in 80/80 fully-in-view frames at 30 and 15 m, and
+  0 decoy hits in 480 frames.
+- *Browser check*: `python3 tests/e2e/check_tak_viewer.py [--url ...]`
+  (Playwright, headless Chromium). It passes through four stages (picture ->
+  searching -> found -> on scene) and saves screenshots to
+  `test-results/tak_viewer/`.
+
 No Gazebo, no ATAK install needed. What stands in for Gazebo:
 
 | Gazebo provided | Replaced by |

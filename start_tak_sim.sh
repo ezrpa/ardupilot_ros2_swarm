@@ -19,6 +19,11 @@ set -e
 cd "$(dirname "$0")"
 
 NUM_DRONES=${1:-4}
+if ! [[ "$NUM_DRONES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "error: drone count must be a positive integer, got '$NUM_DRONES'" >&2
+    echo "usage: $0 <num_drones>   e.g. $0 4" >&2
+    exit 2
+fi
 export SWARM_MISSION=${SWARM_MISSION:-sar}
 export TAK_URL=${TAK_URL:-udp://239.2.3.1:6969}
 export TAK_TRANSPORT=${TAK_TRANSPORT:-auto}

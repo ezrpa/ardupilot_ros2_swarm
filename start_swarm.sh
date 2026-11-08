@@ -6,6 +6,11 @@
 set -e
 
 NUM_DRONES=${1:-2}
+if ! [[ "$NUM_DRONES" =~ ^[1-9][0-9]*$ ]]; then
+    echo "error: drone count must be a positive integer, got '$NUM_DRONES'" >&2
+    echo "usage: $0 <num_drones>   e.g. $0 4" >&2
+    exit 2
+fi
 
 echo "Starting swarm with ${NUM_DRONES} drones..."
 

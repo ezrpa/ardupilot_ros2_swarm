@@ -210,6 +210,15 @@ auto|pytak|stdlib selects `PytakSender` or `CotSender` (file:// always uses
 `CotSender`). `tak_viewer.py` is a read-only PyTAK receiver serving a Leaflet
 map (`src/swarm_control/viewer/index.html`).
 
+SAR defaults in the TAK sim: `SPAWN_LAYOUT=corners` (separate launch points),
+`SAR_SEARCH=bfs` (or `dfs`/`strips`; `sar_search.py`, cells claimed via O_EXCL
+files in logs/sar/claims), `SIM_SCENARIO=sar_scenario` (casualty plus orange
+decoys) and `SIM_REALISM=1`. Person detection is `detect_person`: HSV
+candidates, then a metric shape score with frame-edge rejection. Browser e2e:
+`python3 tests/e2e/check_tak_viewer.py` (Playwright).
+Gotcha: `read A B < <(awk 'printf ...')` under `set -e` exits silently if the
+printf lacks `\n` (read returns 1 at EOF). This killed every drone container.
+
 Gotcha: test feeds on 239.2.3.1:6969 with the default UID prefix merge into
 any live mission's TAK picture. Use `TAK_UID_PREFIX` or unicast for experiments.
 
