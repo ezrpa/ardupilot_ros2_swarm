@@ -51,12 +51,12 @@ import threading
 import time
 
 try:
-    from tak_cot import (CotSender, drone_event, spot_event, rectangle_event,
+    from tak_cot import (make_sender, TRANSPORTS, drone_event, spot_event, rectangle_event,
                          delete_event, casevac_event, chat_event,
                          ne_to_latlon, course_speed, MAGENTA,
                          SPRAYER_PALETTE)
 except ImportError:  # installed as the `scripts` python package
-    from scripts.tak_cot import (CotSender, drone_event, spot_event,
+    from scripts.tak_cot import (make_sender, TRANSPORTS, drone_event, spot_event,
                                  rectangle_event, delete_event, casevac_event,
                                  chat_event, ne_to_latlon, course_speed,
                                  MAGENTA, SPRAYER_PALETTE)
@@ -513,6 +513,10 @@ def parse_args(argv=None):
     ap.add_argument("--key-password", default=_env("TAK_KEY_PASSWORD"))
     ap.add_argument("--ca", default=_env("TAK_CA"),
                     help="TAK Server CA PEM; omit = encrypt without verifying")
+    ap.add_argument("--transport", choices=TRANSPORTS,
+                    default=_env("TAK_TRANSPORT", "auto"),
+                    help="CoT transport: pytak, stdlib, or auto (pytak when "
+                         "installed; env TAK_TRANSPORT)")
     ap.add_argument("--mission", choices=("survey", "sar"),
                     default=_env("SWARM_MISSION", "survey"))
     ap.add_argument("--no-telemetry", action="store_true",
@@ -529,9 +533,10 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     log = lambda m: print(m, flush=True)  # noqa: E731
-    sinks = [CotSender(u, certfile=args.cert, keyfile=args.key,
-                       cafile=args.ca, key_password=args.key_password,
-                       logger=log) for u in args.url]
+    sinks = [make_sender(u, transport=args.transport, certfile=args.cert,
+                         keyfile=args.key, cafile=args.ca,
+                         key_password=args.key_password, logger=log)
+             for u in args.url]
     bridge = SwarmTakBridge(
         args.instances, args.sprayers, logs_dir=args.logs,
         uid_prefix=args.uid_prefix, geoid_offset=args.geoid_offset,
@@ -550,7 +555,8 @@ def main(argv=None):
             log(f"[tak] drone telemetry unavailable ({e}); "
                 f"publishing mission artifacts only")
 
-    log(f"[tak] bridge up ({args.mission}): sinks={args.url} "
+    log(f"[tak] bridge up ({args.mission}): sinks="
+        f"{[f'{u} [{type(s).__name__}]' for u, s in zip(args.url, sinks)]} "
         f"instances={args.instances} "
         f"sprayers={args.sprayers} logs={args.logs}")
     next_scan = next_static = 0.0

@@ -11,9 +11,9 @@
       <visual name="visual">
         <geometry><box><size>0.62 0.42 0.22</size></box></geometry>
         <material>
-          <ambient>1 0.35 0 1</ambient>
-          <diffuse>1 0.35 0 1</diffuse>
-          <emissive>1 0.35 0 1</emissive>
+          <ambient>0.25 0.015 0 1</ambient>
+          <diffuse>0.25 0.015 0 1</diffuse>
+          <emissive>1 0.06 0 1</emissive>
         </material>
       </visual>
     </link>
@@ -22,9 +22,9 @@
       <visual name="visual">
         <geometry><box><size>0.88 0.34 0.17</size></box></geometry>
         <material>
-          <ambient>1 0.35 0 1</ambient>
-          <diffuse>1 0.35 0 1</diffuse>
-          <emissive>1 0.35 0 1</emissive>
+          <ambient>0.25 0.015 0 1</ambient>
+          <diffuse>0.25 0.015 0 1</diffuse>
+          <emissive>1 0.06 0 1</emissive>
         </material>
       </visual>
     </link>
@@ -33,9 +33,9 @@
       <visual name="visual">
         <geometry><box><size>0.58 0.12 0.11</size></box></geometry>
         <material>
-          <ambient>1 0.35 0 1</ambient>
-          <diffuse>1 0.35 0 1</diffuse>
-          <emissive>1 0.35 0 1</emissive>
+          <ambient>0.25 0.015 0 1</ambient>
+          <diffuse>0.25 0.015 0 1</diffuse>
+          <emissive>1 0.06 0 1</emissive>
         </material>
       </visual>
     </link>
@@ -44,9 +44,9 @@
       <visual name="visual">
         <geometry><box><size>0.58 0.12 0.11</size></box></geometry>
         <material>
-          <ambient>1 0.35 0 1</ambient>
-          <diffuse>1 0.35 0 1</diffuse>
-          <emissive>1 0.35 0 1</emissive>
+          <ambient>0.25 0.015 0 1</ambient>
+          <diffuse>0.25 0.015 0 1</diffuse>
+          <emissive>1 0.06 0 1</emissive>
         </material>
       </visual>
     </link>

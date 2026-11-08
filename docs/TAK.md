@@ -20,6 +20,55 @@ detect them, and sees the per-sprayer targets once the prescription is planned.
            (ATAK mesh SA, LAN)     (TAK Server plain)  (TAK Server mTLS)   (debug/replay)
 ```
 
+## TAK simulation without Gazebo (PyTAK + browser map)
+
+```bash
+./start_tak_sim.sh 4                       # search & rescue, 4 drones
+SWARM_MISSION=survey ./start_tak_sim.sh 4  # weed survey (wired, not yet run end to end)
+# open http://localhost:8088               (stop: ./stop_swarm.sh)
+# Verified 2026-11-08, SAR, 4 drones: call raised 50 s into the search,
+# 0.03 m from ground truth, all 4 on scene ~30 s later.
+```
+
+![TAK sim: SAR mission, all units on scene](images/tak_sim_sar.jpg)
+
+No Gazebo, no ATAK install needed. What stands in for Gazebo:
+
+| Gazebo provided | Replaced by |
+|---|---|
+| physics | SITL's built-in multicopter model (`USE_GAZEBO=0`) |
+| camera images | `synthetic_camera.py` (`SIM_SENSORS=synthetic`): renders a nadir frame from the drone's measured pose + heading and the worlds' ground truth (`weed_field/` and `missing_person/ground_truth.json`, mounted at `/root/sim_models`). The frame goes through the **unchanged** `CameraProcessor` HSV detectors and georeferencing, so the planner, the SAR confirm/call/rally logic and the bridge behave exactly as with Gazebo. Rendering is the exact inverse of the georef model: no lens or GPS noise. |
+| 3D view | `tak_viewer.py` + `src/swarm_control/viewer/index.html`: a PyTAK receiver on the CoT feed serving a Leaflet satellite map: search area, per-drone tracks, accumulated camera-coverage footprints and % searched, SAR state per unit, the CASEVAC survivor marker with its confirmation frame, responder lines, and an event/GeoChat feed |
+
+The viewer runs as compose service `tak_viewer` (profile `tak`, host
+networking, port `TAK_VIEWER_PORT`=8088) from the swarm_controller image.
+It only listens: any ATAK/WinTAK/iTAK on the LAN sees the same
+`239.2.3.1:6969` feed. On the host without Docker (Ubuntu's Python refuses system-wide pip, so use
+a venv): `python3 -m venv --system-site-packages .venv && .venv/bin/pip install pytak==7.6.1 && .venv/bin/python src/swarm_control/scripts/tak_viewer.py --logs ./logs`.
+Without PyTAK it falls back to a plain socket.
+
+**PyTAK transport.** The swarm_controller image pins `pytak==7.6.1`.
+`TAK_TRANSPORT` (compose env / `--transport`) selects the bridge's sender:
+`auto` (default: PyTAK when importable), `pytak`, or `stdlib` (the original
+`CotSender`). `PytakSender` runs PyTAK's asyncio `TXWorker` in a daemon
+thread behind the same never-raises `send()` contract. It sends UDP as
+`udp+wo://` so PyTAK doesn't also bind a reader on 6969, uses multicast TTL
+32 like `CotSender`, and reconnects TCP/TLS every 5 s. `file://` always
+uses `CotSender`, because PyTAK opens files `wb+`, which truncates them.
+
+Tests (no ROS/Gazebo): `python3 src/swarm_control/tests/test_tak_sim.py`.
+The OpenCV cases need cv2 and the PyTAK cases need pytak; each is skipped
+when its module is missing.
+
+Gotchas:
+- The viewer and test feeds share ATAK's multicast group with any other
+  swarm on the LAN, and the default UID prefix (`ardupilot-swarm`) is shared
+  too. A test feed sent while a real mission is running mixes into that
+  mission's picture. Use `TAK_UID_PREFIX` or a unicast `TAK_URL` for
+  experiments.
+- Map tiles (Esri World Imagery) and Leaflet load from the internet; the
+  CoT picture itself is local.
+
 ## Quick start
 
 ```bash
@@ -112,8 +161,9 @@ python3 -c "import socket,struct;s=socket.socket(socket.AF_INET,socket.SOCK_DGRA
    `prescription_planner.py` as extra targets / no-spray zones. The sprayers'
    `prepare_mission` hook already consumes a file, so the planner is the
    natural place to merge operator input.
-2. **Sensor footprint**: add `<sensor fov=".." azimuth=".." elevation="-90"/>`
-   to mapper markers so TAK draws the camera footprint.
+2. **Sensor footprint in ATAK**: add `<sensor fov=".." azimuth=".." elevation="-90"/>`
+   to mapper markers so TAK itself draws the camera footprint. The browser
+   viewer already draws the footprints from track + AGL.
 3. **TAK Server data sync**: upload `field_map.jpg` (stitched mosaic) and
    `plan.geojson` as a Data Package / KML overlay after the mission.
 

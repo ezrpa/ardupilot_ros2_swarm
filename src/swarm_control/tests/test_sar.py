@@ -242,6 +242,9 @@ def _make_drone(SearchDrone, inst, swarm, wps, logs, person):
     d.ring_radius, d.alt_step, d.dwell_s = 15.0, 5.0, 0.05
     d.rally_hold_s, d.arrive_radius, d.converge_timeout = 0.3, 4.0, 5.0
     d.standby_timeout = 10.0
+    d.leg_timeout = 5.0
+    d.current_geopose = None
+    d.level_tilt, d.level_timeout = 0.05, 1.0
     d.poll_s, d.converge_poll_s = 0.005, 0.01
     d.home_lat = d.home_lon = d.home_alt = None
     d.bus = sar.SarBus(logs)

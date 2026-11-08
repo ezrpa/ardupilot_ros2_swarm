@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swarm SAR Picture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --bg: #0b0f14;
+  --panel: rgba(12, 17, 23, 0.86);
+  --line: rgba(148, 163, 184, 0.16);
+  --text: #e6edf3;
+  --muted: #8b98a7;
+  --dim: #5b6775;
+  --amber: #f5b83d;
+  --red: #ff4d4f;
+  --green: #3ddc84;
+  --cyan: #38d6f5;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sans: "IBM Plex Sans Condensed", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font-family: var(--sans); overflow: hidden; }
+#map { position: absolute; inset: 0; background: #111; }
+.leaflet-container { font-family: var(--sans); }
+.leaflet-control-attribution { background: rgba(0,0,0,.5) !important; color: #9aa !important; font-size: 10px; }
+.leaflet-control-attribution a { color: #bcc !important; }
+.leaflet-control-zoom a { background: var(--panel) !important; color: var(--text) !important; border-color: var(--line) !important; }
+
+/* ---------- top bar ---------- */
+#topbar { position: absolute; top: 14px; left: 14px; right: 404px; z-index: 500;
+  display: flex; align-items: center; gap: 14px; pointer-events: none; }
+.brand { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 16px; backdrop-filter: blur(8px); display: flex; align-items: center; gap: 12px; }
+.brand .mark { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #ff6a3d, #ff3d6e); box-shadow: 0 0 18px rgba(255,77,79,.45); }
+.brand h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .02em; }
+.brand .sub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
+#status-pill { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .14em;
+  padding: 9px 14px; border-radius: 999px; border: 1px solid currentColor; background: var(--panel);
+  backdrop-filter: blur(8px); display: flex; align-items: center; gap: 9px; }
+#status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px currentColor; animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+.st-wait { color: var(--muted); } .st-search { color: var(--amber); }
+.st-found { color: var(--red); } .st-scene { color: var(--green); }
+
+/* ---------- side panel ---------- */
+#panel { position: absolute; top: 14px; right: 14px; bottom: 14px; width: 376px; z-index: 500;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; backdrop-filter: blur(10px);
+  display: flex; flex-direction: column; overflow: hidden; }
+.sec { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.sec h2 { margin: 0 0 10px; font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: var(--muted);
+  letter-spacing: .14em; text-transform: uppercase; display: flex; justify-content: space-between; }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kpi { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.kpi .v { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+.kpi .l { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.07); margin-top: 12px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--amber), #ffd36b); transition: width .6s; }
+.bar.done > i { background: linear-gradient(90deg, #ff4d4f, #ff8a65); }
+.barlbl { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 6px; }
+
+.drone { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; }
+.drone + .drone { border-top: 1px dashed var(--line); }
+.drone .sw { width: 10px; height: 34px; border-radius: 3px; }
+.drone .cs { font-weight: 600; font-size: 14px; letter-spacing: .03em; }
+.drone .meta { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+.chip { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 5px; border: 1px solid currentColor; white-space: nowrap; }
+.c-search { color: var(--amber); } .c-confirm, .c-call { color: var(--red); }
+.c-conv { color: var(--cyan); } .c-scene { color: var(--green); } .c-idle { color: var(--dim); }
+
+#survivor { display: none; }
+#survivor.show { display: block; background: linear-gradient(180deg, rgba(255,77,79,.14), transparent); }
+#survivor h2 { color: #ff8a8c; }
+.sv { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: start; }
+.sv img { width: 112px; height: 84px; object-fit: none; object-position: center; border-radius: 6px; border: 1px solid rgba(255,77,79,.5); background: #222; }
+.sv .t { font-size: 13px; line-height: 1.35; }
+.sv .coord { font-family: var(--mono); font-size: 11.5px; color: #ffb3b4; margin-top: 6px; }
+
+#feed { flex: 1; overflow: hidden; padding: 12px 16px; display: flex; flex-direction: column; }
+#feed ul { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+#feed li { display: grid; grid-template-columns: 58px 1fr; gap: 8px; font-size: 12.5px; padding: 5px 0; line-height: 1.35; }
+#feed li time { font-family: var(--mono); font-size: 11px; color: var(--dim); padding-top: 1px; }
+#feed li.alert { color: #ffb3b4; } #feed li.chat { color: #9fe7ff; }
+#feed li.chat b { color: var(--cyan); }
+
+#foot { padding: 9px 16px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 10.5px; color: var(--dim);
+  display: flex; justify-content: space-between; gap: 8px; }
+#foot .live { color: var(--green); }
+
+/* ---------- legend ---------- */
+#legend { position: absolute; left: 14px; bottom: 26px; z-index: 500; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 14px; backdrop-filter: blur(8px); font-size: 12px; color: var(--muted);
+  display: grid; grid-template-columns: auto auto; gap: 6px 18px; }
+#legend span { display: flex; align-items: center; gap: 8px; }
+#legend i { display: inline-block; }
+.lg-area { width: 16px; height: 10px; border: 1.5px dashed var(--cyan); }
+.lg-cov { width: 16px; height: 10px; background: rgba(245,184,61,.35); }
+.lg-trail { width: 16px; height: 3px; background: var(--amber); border-radius: 2px; }
+.lg-surv { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+/* ---------- map markers ---------- */
+.dr-icon { position: relative; }
+.dr-icon svg { filter: drop-shadow(0 0 6px rgba(0,0,0,.8)); transition: transform .8s linear; }
+.dr-lbl { position: absolute; left: 22px; top: -9px; white-space: nowrap; font-family: var(--mono); font-size: 11px; font-weight: 600;
+  padding: 2px 6px; border-radius: 4px; background: rgba(8,12,16,.82); border-left: 3px solid; color: #fff; }
+.dr-lbl small { display: block; font-weight: 400; font-size: 9.5px; color: #b9c4cf; letter-spacing: .04em; }
+.sv-icon { position: relative; }
+.sv-core { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; background: var(--red);
+  border: 3px solid #fff; box-shadow: 0 0 14px var(--red); }
+.sv-pulse { position: absolute; left: -9px; top: -9px; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--red); animation: pulse 2s ease-out infinite; }
+.sv-pulse.b { animation-delay: 1s; }
+@keyframes pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(5.5); opacity: 0; } }
+.sv-lbl { position: absolute; right: 18px; top: -12px; white-space: nowrap; font-family: var(--mono); font-weight: 700; font-size: 12px;
+  letter-spacing: .12em; color: #fff; background: var(--red); padding: 3px 8px; border-radius: 4px; box-shadow: 0 0 16px rgba(255,77,79,.6); }
+.area-lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--cyan); white-space: nowrap;
+  text-shadow: 0 0 4px #000, 0 0 8px #000; }
+
+#empty { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 400; text-align: center; color: var(--muted);
+  font-family: var(--mono); font-size: 13px; background: var(--panel); padding: 18px 22px; border-radius: 10px; border: 1px solid var(--line); }
+
+@media (max-width: 820px) {
+  #panel { top: auto; left: 10px; right: 10px; height: 46%; width: auto; }
+  #topbar { right: 10px; left: 10px; flex-wrap: wrap; }
+  #legend { display: none; }
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="topbar">
+  <div class="brand">
+    <div class="mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v18M3 12h18"/></svg></div>
+    <div><h1 id="title">Swarm Search &amp; Rescue</h1><div class="sub">TAK common operating picture · Cursor-on-Target</div></div>
+  </div>
+  <div id="status-pill" class="st-wait"><span class="dot"></span><span id="status-txt">WAITING FOR COT</span></div>
+</div>
+
+<aside id="panel">
+  <div class="sec">
+    <h2><span>Mission</span><span id="clock">--:--:--</span></h2>
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="k-drones">0</div><div class="l">drones in picture</div></div>
+      <div class="kpi"><div class="v" id="k-cov">0%</div><div class="l">area searched</div></div>
+      <div class="kpi"><div class="v" id="k-time">00:00</div><div class="l">mission time</div></div>
+    </div>
+    <div class="bar" id="bar"><i id="bar-fill"></i></div>
+    <div class="barlbl"><span id="bar-l">search progress</span><span id="bar-r">0 / 0 waypoints</span></div>
+  </div>
+  <div class="sec" id="survivor">
+    <h2><span>Survivor located</span><span id="sv-time"></span></h2>
+    <div class="sv">
+      <img id="sv-img" alt="confirmation frame">
+      <div><div class="t" id="sv-text"></div><div class="coord" id="sv-coord"></div></div>
+    </div>
+  </div>
+  <div class="sec"><h2><span>Search units</span><span id="units-n"></span></h2><div id="drones"></div></div>
+  <div id="feed"><div class="sec" style="padding:0;border:0"><h2><span>Event feed &amp; GeoChat</span></h2></div><ul id="feed-list"></ul></div>
+  <div id="foot"><span><span class="live">●</span> <span id="foot-src">CoT</span></span><span id="foot-n">0 events</span></div>
+</aside>
+
+<div id="legend">
+  <span><i class="lg-area"></i>search area</span>
+  <span><i class="lg-cov"></i>camera coverage</span>
+  <span><i class="lg-trail"></i>flight track</span>
+  <span><i class="lg-surv"></i>survivor (CASEVAC)</span>
+</div>
+<div id="empty">Listening for Cursor-on-Target…<br><small>start the swarm with TAK_URL set</small></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const PALETTE = ["#38d6f5", "#f5b83d", "#a3e635", "#c084fc", "#f472b6", "#60a5fa"];
+const HFOV = 1.2, ASPECT = 0.75, M_PER_DEG = 111111;
+
+const map = L.map("map", { zoomControl: true, attributionControl: true, zoomSnap: 0.25 })
+  .setView([40.0728, -105.2306], 18);
+map.zoomControl.setPosition("bottomright");
+L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 21, maxNativeZoom: 19, attribution: "Imagery © Esri, Maxar, Earthstar Geographics" }).addTo(map);
+// slight darkening so overlays pop
+L.rectangle([[-85, -180], [85, 180]], { stroke: false, fillColor: "#05080c", fillOpacity: 0.28, interactive: false }).addTo(map);
+
+const layers = { area: L.layerGroup().addTo(map), cov: L.layerGroup().addTo(map), trail: L.layerGroup().addTo(map),
+  links: L.layerGroup().addTo(map), marks: L.layerGroup().addTo(map), drones: L.layerGroup().addTo(map) };
+const droneLayer = {}, colorOf = {}, covDrawn = {};
+let fitted = false, firstSeen = null, areaPoly = null, survivorMarker = null, userMoved = false;
+function fitArea() {
+  if (!areaPoly) return;
+  map.invalidateSize();
+  const narrow = window.innerWidth < 820;
+  map.fitBounds(areaPoly.getBounds().pad(0.08), narrow ? { padding: [20, 20] }
+    : { paddingTopLeft: [30, 80], paddingBottomRight: [410, 30] });
+}
+// keep the whole search area framed until someone pans/zooms by hand
+window.addEventListener("resize", () => { if (!userMoved) fitArea(); });
+map.on("dragstart", () => { userMoved = true; });
+map.getContainer().addEventListener("wheel", () => { userMoved = true; }, { passive: true });
+
+function color(uid) {
+  if (!(uid in colorOf)) colorOf[uid] = PALETTE[Object.keys(colorOf).length % PALETTE.length];
+  return colorOf[uid];
+}
+function argbToCss(v, alphaOverride) {
+  const u = v >>> 0, a = ((u >>> 24) & 255) / 255;
+  return `rgba(${(u >>> 16) & 255},${(u >>> 8) & 255},${u & 255},${alphaOverride ?? a})`;
+}
+function offset(lat, lon, n, e) {
+  return [lat + n / M_PER_DEG, lon + e / (M_PER_DEG * Math.cos(lat * Math.PI / 180))];
+}
+function footprint(f) {
+  const hw = f.agl * Math.tan(HFOV / 2), hh = hw * ASPECT, c = (f.course || 0) * Math.PI / 180;
+  return [[hh, -hw], [hh, hw], [-hh, hw], [-hh, -hw]].map(([fw, rt]) =>
+    offset(f.lat, f.lon, fw * Math.cos(c) - rt * Math.sin(c), fw * Math.sin(c) + rt * Math.cos(c)));
+}
+function sarClass(s) {
+  if (!s) return ["c-idle", "standby"];
+  if (s.startsWith("searching")) return ["c-search", s.replace("searching ", "")];
+  if (s.startsWith("confirming")) return ["c-confirm", "confirming"];
+  if (s.startsWith("calling")) return ["c-call", "calling"];
+  if (s.startsWith("converging")) return ["c-conv", s.replace("converging, ", "→ ")];
+  if (s.startsWith("ON SCENE")) return ["c-scene", s.includes("finder") ? "on scene · finder" : "on scene"];
+  if (s.startsWith("search complete")) return ["c-idle", "strip done"];
+  if (s.startsWith("returning")) return ["c-idle", "RTB"];
+  return ["c-idle", s];
+}
+function droneIcon(d, col) {
+  const [, st] = sarClass(d.sar);
+  const agl = d.agl != null ? `${d.agl.toFixed(0)} m` : "";
+  return L.divIcon({ className: "", iconSize: [0, 0], html:
+    `<div class="dr-icon"><svg width="34" height="34" viewBox="-17 -17 34 34" style="position:absolute;left:-17px;top:-17px;transform:rotate(${d.course || 0}deg)">
+       <circle r="15" fill="${col}" fill-opacity=".18" stroke="${col}" stroke-opacity=".5"/>
+       <path d="M0,-11 L7,8 L0,4 L-7,8 Z" fill="${col}" stroke="#05080c" stroke-width="1.4"/></svg>
+     <div class="dr-lbl" style="border-color:${col}">${d.callsign}<small>${st} · ${agl}</small></div></div>` });
+}
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const hhmmss = t => new Date(t * 1000).toLocaleTimeString([], { hour12: false });
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function render(s) {
+  document.getElementById("empty").style.display = s.items.length ? "none" : "block";
+  document.getElementById("clock").textContent = hhmmss(s.now);
+  document.getElementById("title").textContent = s.meta.title;
+  document.getElementById("foot-src").textContent = `PyTAK rx · ${s.meta.listen.join(" ")}`.replace("PyTAK rx", s.meta.transport === "pytak" ? "PyTAK rx" : "socket rx");
+  document.getElementById("foot-n").textContent = `${s.events_rx.toLocaleString()} CoT events`;
+
+  const drones = s.items.filter(i => i.type.startsWith("a-")).sort((a, b) => (a.callsign > b.callsign ? 1 : -1));
+  const area = s.items.find(i => i.type === "u-d-r");
+  const casevac = s.items.find(i => i.type.startsWith("b-r-f-h-c"));
+
+  // --- search area
+  if (area && area.polygon) {
+    const key = JSON.stringify(area.polygon);
+    if (!areaPoly || areaPoly._key !== key) {
+      layers.area.clearLayers();
+      areaPoly = L.polygon(area.polygon, { color: "#38d6f5", weight: 2, dashArray: "8 6", fillColor: "#38d6f5", fillOpacity: 0.04, interactive: false }).addTo(layers.area);
+      areaPoly._key = key;
+      const sw = area.polygon[3] || area.polygon[0];
+      L.marker(sw, { interactive: false, icon: L.divIcon({ className: "", iconSize: [0, 0],
+        html: `<div class="area-lbl" style="transform:translate(2px,6px)">${esc(area.callsign)} · ${esc((area.remarks || "").split("|")[0].trim())}</div>` }) }).addTo(layers.area);
+    }
+    if (!fitted) { fitArea(); fitted = true; }
+  } else if (!fitted && drones.length) { map.setView([drones[0].lat, drones[0].lon], 18); }
+
+  // --- drones, trails, coverage
+  const seen = new Set();
+  drones.forEach(d => {
+    const col = color(d.uid); seen.add(d.uid);
+    let L_ = droneLayer[d.uid];
+    if (!L_) {
+      L_ = droneLayer[d.uid] = {
+        glow: L.polyline([], { color: col, weight: 7, opacity: 0.18, interactive: false }).addTo(layers.trail),
+        trail: L.polyline([], { color: col, weight: 2.2, opacity: 0.95, interactive: false }).addTo(layers.trail),
+        marker: L.marker([d.lat, d.lon], { zIndexOffset: 1000 }).addTo(layers.drones) };
+      covDrawn[d.uid] = 0;
+    }
+    L_.trail.setLatLngs(d.trail); L_.glow.setLatLngs(d.trail);
+    L_.marker.setLatLng([d.lat, d.lon]).setIcon(droneIcon(d, col)).setOpacity(d.is_stale ? 0.45 : 1);
+    const fps = d.footprints || [];
+    for (let k = covDrawn[d.uid]; k < fps.length; k++)
+      L.polygon(footprint(fps[k]), { stroke: false, fillColor: col, fillOpacity: 0.11, interactive: false }).addTo(layers.cov);
+    covDrawn[d.uid] = fps.length;
+  });
+
+  // coverage % = sampled grid cells inside the area hit by any footprint
+  let pct = 0;
+  if (area && area.polygon) {
+    const lats = area.polygon.map(p => p[0]), lons = area.polygon.map(p => p[1]);
+    const la0 = Math.min(...lats), la1 = Math.max(...lats), lo0 = Math.min(...lons), lo1 = Math.max(...lons);
+    const fpPolys = drones.flatMap(d => (d.footprints || []).map(f => ({ f, hw: f.agl * Math.tan(HFOV / 2) })));
+    const N = 24; let hit = 0;
+    for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
+      const lat = la0 + (a + .5) / N * (la1 - la0), lon = lo0 + (b + .5) / N * (lo1 - lo0);
+      if (fpPolys.some(({ f, hw }) => {
+        const n = (lat - f.lat) * M_PER_DEG, e = (lon - f.lon) * M_PER_DEG * Math.cos(f.lat * Math.PI / 180);
+        const c = (f.course || 0) * Math.PI / 180, fw = n * Math.cos(c) + e * Math.sin(c), rt = -n * Math.sin(c) + e * Math.cos(c);
+        return Math.abs(rt) <= hw && Math.abs(fw) <= hw * ASPECT;
+      })) hit++;
+    }
+    pct = Math.round(100 * hit / (N * N));
+  }
+
+  // --- survivor + responder links
+  layers.links.clearLayers();
+  if (casevac) {
+    if (!survivorMarker) {
+      survivorMarker = L.marker([casevac.lat, casevac.lon], { zIndexOffset: 2000, icon: L.divIcon({ className: "", iconSize: [0, 0],
+        html: `<div class="sv-icon"><div class="sv-pulse"></div><div class="sv-pulse b"></div><div class="sv-core"></div><div class="sv-lbl">${esc(casevac.callsign)}</div></div>` }) }).addTo(layers.marks);
+      L.circle([casevac.lat, casevac.lon], { radius: 15, color: "#ff4d4f", weight: 1.5, dashArray: "4 5", fill: false, interactive: false }).addTo(layers.marks);
+    }
+    drones.forEach(d => {
+      const [cls] = sarClass(d.sar);
+      if (cls === "c-conv" || cls === "c-scene")
+        L.polyline([[d.lat, d.lon], [casevac.lat, casevac.lon]], { color: cls === "c-scene" ? "#3ddc84" : "#38d6f5", weight: 1.6, dashArray: "5 6", opacity: 0.85, interactive: false }).addTo(layers.links);
+    });
+  }
+  s.items.filter(i => i.type === "b-m-p-s-m").forEach(m => {
+    L.circleMarker([m.lat, m.lon], { radius: 5, color: "#fff", weight: 1, fillColor: m.color != null ? argbToCss(m.color, 1) : "#f0f", fillOpacity: 1 }).addTo(layers.links);
+  });
+
+  // --- panel: status
+  const pill = document.getElementById("status-pill"), txt = document.getElementById("status-txt");
+  const onScene = drones.filter(d => (d.sar || "").startsWith("ON SCENE")).length;
+  if (casevac && drones.length && onScene === drones.length) { pill.className = "st-scene"; txt.textContent = `ALL ${onScene} UNITS ON SCENE`; }
+  else if (casevac) { pill.className = "st-found"; txt.textContent = `SURVIVOR FOUND · ${onScene}/${drones.length} ON SCENE`; }
+  else if (drones.length) { pill.className = "st-search"; txt.textContent = "SEARCH IN PROGRESS"; }
+  else { pill.className = "st-wait"; txt.textContent = "WAITING FOR COT"; }
+
+  const m = /(\d+)\/(\d+) waypoints/.exec(area?.remarks || "");
+  const done = m ? +m[1] : 0, total = m ? +m[2] : 0;
+  document.getElementById("bar").className = "bar" + (casevac ? " done" : "");
+  document.getElementById("bar-fill").style.width = casevac ? "100%" : (total ? `${100 * done / total}%` : "0");
+  document.getElementById("bar-l").textContent = casevac ? "search terminated: survivor found" : "search progress";
+  document.getElementById("bar-r").textContent = total ? `${done} / ${total} waypoints` : "";
+  document.getElementById("k-drones").textContent = drones.length;
+  document.getElementById("k-cov").textContent = `${pct}%`;
+  document.getElementById("k-time").textContent = mmss(s.now - (s.first_track ?? (s.now - s.uptime)));
+
+  // drones list
+  document.getElementById("units-n").textContent = `${drones.length} airborne`;
+  document.getElementById("drones").innerHTML = drones.map(d => {
+    const [cls, st] = sarClass(d.sar);
+    const bits = [d.mode, d.agl != null ? `${d.agl.toFixed(1)} m AGL` : null, d.speed != null ? `${d.speed.toFixed(1)} m/s` : null,
+      d.battery != null ? `${d.battery.toFixed(0)}%` : null].filter(Boolean).join(" · ");
+    return `<div class="drone"><div class="sw" style="background:${color(d.uid)}"></div>
+      <div><div class="cs">${esc(d.callsign)}</div><div class="meta">${esc(bits)}</div></div>
+      <span class="chip ${cls}">${esc(st)}</span></div>`;
+  }).join("");
+
+  // survivor card
+  const sv = document.getElementById("survivor");
+  if (casevac) {
+    sv.classList.add("show");
+    const im = /Image: (\S+\.jpg)/.exec(casevac.remarks || "");
+    const img = document.getElementById("sv-img");
+    if (im && img.dataset.src !== im[1]) { img.dataset.src = im[1]; img.src = `/logs/${im[1]}`; img.onerror = () => { img.style.display = "none"; }; }
+    document.getElementById("sv-text").textContent = (casevac.remarks || "").split(". Image")[0].split(" (")[0];
+    document.getElementById("sv-coord").textContent = `${casevac.lat.toFixed(6)}, ${casevac.lon.toFixed(6)}`;
+    // call time = when the CASEVAC first arrived (the event itself is re-broadcast every 30 s)
+    const first = s.feed.find(f => f.text.startsWith("CASEVAC point"));
+    document.getElementById("sv-time").textContent = first ? hhmmss(first.t) : (casevac.time ? hhmmss(casevac.time) : "");
+  }
+
+  // feed
+  document.getElementById("feed-list").innerHTML = s.feed.slice().reverse().map(f => {
+    const t = esc(f.text).replace(/^([^:]+):/, f.kind === "chat" ? "<b>$1:</b>" : "$1:");
+    return `<li class="${f.kind}"><time>${hhmmss(f.t)}</time><span>${t}</span></li>`;
+  }).join("");
+}
+
+async function tick() {
+  try { const r = await fetch("/api/state", { cache: "no-store" }); render(await r.json()); }
+  catch (e) { document.getElementById("status-txt").textContent = "VIEWER OFFLINE"; }
+  setTimeout(tick, 1000);
+}
+tick();
+</script>
+</body>
+</html>

@@ -55,6 +55,13 @@ services:
       - TAK_VIDEO_URL=${TAK_VIDEO_URL:-}
       - TAK_GEOID_OFFSET=${TAK_GEOID_OFFSET:-}
       - TAK_UID_PREFIX=${TAK_UID_PREFIX:-}
+      # CoT transport: auto (PyTAK when installed) | pytak | stdlib
+      - TAK_TRANSPORT=${TAK_TRANSPORT:-auto}
+      # SIM_SENSORS=synthetic: render camera frames from the Gazebo worlds'
+      # ground truth instead of a Gazebo stream (no-Gazebo runs, see
+      # start_tak_sim.sh / synthetic_camera.py).
+      - SIM_SENSORS=${SIM_SENSORS:-}
+      - SIM_MODELS_DIR=/root/sim_models
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       #- ROS_DISCOVERY_SERVER=172.20.0.10:11888
     volumes:
@@ -63,12 +70,34 @@ services:
       - ./src/scripts:/root/scripts:ro
       - ./src/dockerfiles/config:/root/config:ro
       - ./tak:/root/tak:ro
+      - ./src/custom_gz/models:/root/sim_models:ro
 #    stdin_open: true
 #    tty: true
 #    command: [ "/bin/bash" ]
     command: [ "/root/scripts/start_swarm_controller.sh" ]
     depends_on:
       - discovery_server
+
+  # Browser map of the CoT feed (no ATAK needed): http://localhost:8088
+  # Started by start_tak_sim.sh; same image as swarm_controller (has PyTAK).
+  tak_viewer:
+    profiles: ["tak"]
+    build:
+      context: ./src/dockerfiles
+      dockerfile: Dockerfile.ros2
+    container_name: tak_viewer
+    init: true
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - TAK_VIEWER_LISTEN=${TAK_VIEWER_LISTEN:-udp://239.2.3.1:6969}
+      - TAK_VIEWER_PORT=${TAK_VIEWER_PORT:-8088}
+      - TAK_TRANSPORT=${TAK_TRANSPORT:-auto}
+    volumes:
+      - ./src/swarm_control:/ros2_ws/src/swarm_control:ro
+      - ./logs:/root/logs:ro
+    command: ["python3", "-u", "/ros2_ws/src/swarm_control/scripts/tak_viewer.py",
+              "--logs", "/root/logs"]
 
   drone_ardu:
     profiles: ["manual"]

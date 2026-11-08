@@ -13,7 +13,7 @@ Camera failures are non-fatal by design: if OpenCV, GStreamer, or the stream
 is unavailable the drone flies its mission exactly like a BaseDrone.
 """
 from base_drone_dds import BaseDrone, main
-from scripts.camera_processor import CameraProcessor
+from scripts.synthetic_camera import make_camera
 
 
 class CameraDrone(BaseDrone):
@@ -24,7 +24,7 @@ class CameraDrone(BaseDrone):
         self.camera_port = self.get_parameter(
             'camera_port').get_parameter_value().integer_value
 
-        self.camera = CameraProcessor(
+        self.camera = make_camera(
             self.drone_id, self.camera_port, logger=self.get_logger())
 
     def on_waypoint_reached(self, wp_index, lat, lon, alt):

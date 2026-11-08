@@ -28,7 +28,15 @@ METERS_PER_DEG_LAT = 111111.0
 SPAWN_XY = (52.5, 50.0)      # centre of the drone spawn cluster
 SPAWN_EXCLUSION_M = 20.0
 
-ORANGE = "1 0.35 0 1"        # hi-vis coverall: OpenCV H ~10, fully saturated
+# Hi-vis coverall. Emissive carries the colour; lit ambient/diffuse are kept
+# weak (EMISSIVE_BASE_SCALE). With full-strength diffuse on top of emissive,
+# red clips at 255 under the sun while green keeps rising, and the render
+# comes out YELLOW (measured OpenCV H ~28) - outside the detector's H 0-14
+# band. Colours are LINEAR and the camera outputs sRGB, so green must be tiny:
+# linear 0.3 renders ~150/255 (amber, measured H ~20); linear 0.06 renders
+# ~69/255, i.e. hi-vis orange at H ~8-9.
+ORANGE = "1 0.06 0 1"
+EMISSIVE_BASE_SCALE = 0.25
 SKIN = "0.80 0.62 0.48 1"
 BOOTS = "0.12 0.10 0.08 1"
 
@@ -70,6 +78,10 @@ def _link(name, px, py, pz, geom, colour, emissive):
     geom_xml = (f"<box><size>{size}</size></box>" if kind == "box"
                 else f"<sphere><radius>{size}</radius></sphere>")
     emis = colour if emissive else "0 0 0 1"
+    if emissive:  # see ORANGE: weak lit colour so the hue does not clip
+        r, g, b, alpha = (float(v) for v in colour.split())
+        k = EMISSIVE_BASE_SCALE
+        colour = f"{r * k:g} {g * k:g} {b * k:g} {alpha:g}"
     return f"""    <link name="{name}">
       <pose>{px} {py} {pz} 0 0 0</pose>
       <visual name="visual">

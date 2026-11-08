@@ -187,6 +187,13 @@ class CameraProcessor:
                 time.sleep(0.05)
 
     # --------------------------------------------------------------- capture
+    def _grab_frame(self, lat=None, lon=None, alt=None, heading=None):
+        """Freshest stream frame (a copy), or None. The pose arguments are
+        unused here; synthetic_camera.SyntheticCamera renders from them."""
+        with self._lock:
+            return (None if self._latest_frame is None
+                    else self._latest_frame.copy())
+
     def capture(self, wp_index, lat=None, lon=None, alt=None, extra=None,
                 prefix="wp", heading=None):
         """Save the freshest frame as <prefix>_<n>.jpg with a JSON geotag
@@ -199,8 +206,7 @@ class CameraProcessor:
         if not self.active:
             return None
 
-        with self._lock:
-            frame = None if self._latest_frame is None else self._latest_frame.copy()
+        frame = self._grab_frame(lat=lat, lon=lon, alt=alt, heading=heading)
         if frame is None:
             self._warn(f"{prefix} {wp_index}: no frame received yet")
             return None

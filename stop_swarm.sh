@@ -8,8 +8,9 @@ echo "Stopping swarm containers..."
 docker ps -a | grep -E "drone-ardu-|micro-ros-agent-drone-" | awk '{print $1}' | xargs -r docker stop
 docker ps -a | grep -E "drone-ardu-|micro-ros-agent-drone-" | awk '{print $1}' | xargs -r docker rm
 
-# Stop compose services
-docker compose down
+# Stop compose services (tak_viewer lives in the "tak" profile, which a
+# plain `down` skips)
+docker compose --profile tak down
 
 # Kill any processes using the ports
 for port in {2019..2029}; do

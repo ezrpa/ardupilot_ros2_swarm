@@ -189,10 +189,29 @@ domain (one `rclpy.Context(domain_id=i+1)` each) on `/ap/geopose/filtered`,
 because QGC owns UDP 14550+i and the sprayer node / spray visualizer own
 SERIAL1/2 TCP. It also watches `logs/drone_*/wp_*.json` (live weed markers)
 and `logs/prescriptions/sprayer_*.json` (targets replace detections via
-`t-x-d-d` deletes). `tak_cot.py` is stdlib-only (no pytak). CoT `hae` is
+`t-x-d-d` deletes). `tak_cot.py` encoders are stdlib; PyTAK is optional (below). CoT `hae` is
 ellipsoidal: AMSL + `TAK_GEOID_OFFSET` (default −17 m at the field origin).
 Certs go in `./tak` (gitignored, mounted at `/root/tak`). AFSIM pairing
 (DIS gateway, LVC split) is a design only — see `docs/TAK.md`.
+
+### TAK simulation without Gazebo (`docs/TAK.md`)
+```bash
+./start_tak_sim.sh 4          # SAR (verified); SWARM_MISSION=survey wired but untested
+# http://localhost:8088       (tak_viewer, compose profile "tak")
+python3 src/swarm_control/tests/test_tak_sim.py
+```
+SITL built-in physics replace Gazebo physics. `SIM_SENSORS=synthetic` makes the
+drone nodes' `make_camera()` (`synthetic_camera.py`) render nadir frames from the
+worlds' ground-truth JSON (mounted at `/root/sim_models`). Those frames go
+through the unchanged HSV detectors and georeferencing. `CameraProcessor` gets
+each frame from `_grab_frame()`, which the synthetic camera overrides. CoT goes
+out via PyTAK: `pytak==7.6.1` in Dockerfile.ros2, and `TAK_TRANSPORT`
+auto|pytak|stdlib selects `PytakSender` or `CotSender` (file:// always uses
+`CotSender`). `tak_viewer.py` is a read-only PyTAK receiver serving a Leaflet
+map (`src/swarm_control/viewer/index.html`).
+
+Gotcha: test feeds on 239.2.3.1:6969 with the default UID prefix merge into
+any live mission's TAK picture. Use `TAK_UID_PREFIX` or unicast for experiments.
 
 ### Search & Rescue Mission (`docs/SAR.md`)
 ```bash

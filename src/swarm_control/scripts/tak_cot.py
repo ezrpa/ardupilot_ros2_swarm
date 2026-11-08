@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Cursor-on-Target (CoT) encoding + transports for TAK integration.
 
-Pure standard library (no pytak / asyncio) so it runs unchanged inside the
-swarm_controller container and on the host. tak_bridge.py feeds it swarm
-state; this module only knows CoT.
+The encoders and CotSender are pure standard library, so they run unchanged
+inside the swarm_controller container and on the host. PytakSender (bottom)
+is an optional PyTAK-backed transport with the same send()/close() contract;
+make_sender() picks one (TAK_TRANSPORT=auto|pytak|stdlib). tak_bridge.py
+feeds it swarm state; this module only knows CoT.
 
 CoT event anatomy (what ATAK / WinTAK / iTAK / TAK Server consume):
 
@@ -321,3 +323,190 @@ class CotSender:
                 except OSError:
                     pass
                 self._sock = None
+
+
+# ------------------------------------------------------- pytak transport
+
+def _import_pytak():
+    """Import PyTAK quietly (it warns about optional aiohttp, which is only
+    needed for its marti/websocket transports, not used here)."""
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        import pytak
+    return pytak
+
+
+def pytak_available():
+    try:
+        _import_pytak()
+        return True
+    except ImportError:
+        return False
+
+
+class PytakSender:
+    """CoT sink backed by PyTAK (pip install pytak; pinned 7.6.1 in
+    Dockerfile.ros2). Same contract as CotSender: thread-safe send(xml) that
+    never raises and returns False when the event could not be queued.
+
+    PyTAK is asyncio-based and the bridge is threaded, so a private event
+    loop runs in a daemon thread: protocol_factory() opens the writer, a
+    pytak.TXWorker drains an asyncio.Queue fed from send() via
+    call_soon_threadsafe, and any transport error tears the connection down
+    and reconnects after 5 s (queued events are dropped meanwhile — CoT is a
+    live picture, the bridge re-sends state every cycle).
+
+    URL mapping: udp:// becomes udp+wo:// so PyTAK does not also bind a
+    reader on the port (every container runs with host networking; a reader
+    would contend with the viewer / ATAK on 6969). tls:// certs go through
+    PYTAK_TLS_CLIENT_* config. file:// is not offered here (PyTAK opens
+    files 'wb+', truncating the log) — make_sender keeps CotSender for it.
+    """
+
+    SCHEMES = ("udp", "tcp", "tls", "ssl")
+
+    def __init__(self, url, certfile=None, keyfile=None, cafile=None,
+                 key_password=None, verify_hostname=True, logger=print,
+                 multicast_ttl=32, max_queue=500):
+        import asyncio
+        pytak = _import_pytak()  # ImportError propagates to the caller
+        u = urlparse(url)
+        if u.scheme not in self.SCHEMES:
+            raise ValueError(f"pytak transport does not handle {url}")
+        if not u.hostname or not u.port:
+            raise ValueError(f"TAK URL needs host and port: {url}")
+        self.url = url
+        self.log = logger
+        self.sent = 0
+        self._pytak = pytak
+        self._asyncio = asyncio
+        scheme = "tls" if u.scheme == "ssl" else u.scheme
+        cot_url = f"{scheme}+wo://{u.hostname}:{u.port}" if scheme == "udp" \
+            else f"{scheme}://{u.hostname}:{u.port}"
+        self.config = {"COT_URL": cot_url,
+                       "PYTAK_MULTICAST_TTL": str(int(multicast_ttl))}
+        if scheme == "tls":
+            if certfile:
+                self.config["PYTAK_TLS_CLIENT_CERT"] = certfile
+            if keyfile:
+                self.config["PYTAK_TLS_CLIENT_KEY"] = keyfile
+            if key_password:
+                self.config["PYTAK_TLS_CLIENT_PASSWORD"] = key_password
+            if cafile:
+                self.config["PYTAK_TLS_CLIENT_CAFILE"] = cafile
+                if not verify_hostname:
+                    self.config["PYTAK_TLS_DONT_CHECK_HOSTNAME"] = "1"
+            else:  # same policy as CotSender: encrypt, don't authenticate
+                self.config["PYTAK_TLS_DONT_VERIFY"] = "1"
+                self.config["PYTAK_TLS_DONT_CHECK_HOSTNAME"] = "1"
+        # PyTAK expects a ConfigParser section (TLS helpers call
+        # getboolean etc. on it), not a plain dict.
+        from configparser import ConfigParser
+        cfg = ConfigParser(interpolation=None)
+        cfg["pytak"] = self.config
+        self.config = cfg["pytak"]
+        self._max_queue = max_queue
+        self._loop = asyncio.new_event_loop()
+        self._queue = None
+        self._connected = False
+        self._closed = False
+        ready = threading.Event()
+        self._thread = threading.Thread(target=self._run, args=(ready,),
+                                        daemon=True, name=f"pytak {url}")
+        self._thread.start()
+        ready.wait(2.0)
+
+    # -- loop thread --------------------------------------------------------
+    def _run(self, ready):
+        asyncio = self._asyncio
+        asyncio.set_event_loop(self._loop)
+        self._queue = asyncio.Queue(maxsize=self._max_queue)
+        ready.set()
+        try:
+            self._loop.run_until_complete(self._supervise())
+        except Exception as e:  # pragma: no cover - defensive
+            self.log(f"[tak] pytak loop for {self.url} stopped: {e}")
+
+    async def _supervise(self):
+        asyncio, pytak = self._asyncio, self._pytak
+        while not self._closed:
+            writer = None
+            try:
+                _, writer = await pytak.protocol_factory(self.config)
+                worker = pytak.TXWorker(self._queue, self.config, writer)
+                self._connected = True
+                self.log(f"[tak] pytak connected {self.url} "
+                         f"({self.config['COT_URL']})")
+                while not self._closed:
+                    data = await self._queue.get()
+                    if data is None:
+                        break
+                    await worker.send_data(data)
+                    self.sent += 1
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # transport errors of every flavour
+                if not self._closed:
+                    self.log(f"[tak] pytak {self.url} failed: {e}; "
+                             f"retry in 5s")
+            finally:
+                self._connected = False
+                self._close_writer(writer)
+            if not self._closed:
+                while not self._queue.empty():  # stale picture, drop it
+                    self._queue.get_nowait()
+                await asyncio.sleep(5.0)
+
+    @staticmethod
+    def _close_writer(writer):
+        if writer is None:
+            return
+        try:
+            writer.close()
+        except Exception:
+            pass
+
+    def _enqueue(self, data):
+        try:
+            self._queue.put_nowait(data)
+        except self._asyncio.QueueFull:
+            pass  # TAK slower than the bridge: drop rather than block
+
+    # -- caller threads -----------------------------------------------------
+    def send(self, xml):
+        if self._closed or self._queue is None or not self._connected:
+            return False
+        try:
+            self._loop.call_soon_threadsafe(self._enqueue, xml.encode("utf-8"))
+            return True
+        except RuntimeError:  # loop already closed
+            return False
+
+    def close(self):
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self._loop.call_soon_threadsafe(self._enqueue, None)
+        except RuntimeError:
+            pass
+        self._thread.join(timeout=2.0)
+
+
+TRANSPORTS = ("auto", "pytak", "stdlib")
+
+
+def make_sender(url, transport="auto", logger=print, **kw):
+    """CoT sink factory. transport: 'stdlib' = CotSender; 'pytak' =
+    PytakSender (error if pytak is missing); 'auto' = PyTAK when installed
+    and the scheme is one it handles, else CotSender. file:// is always
+    CotSender."""
+    if transport not in TRANSPORTS:
+        raise ValueError(f"unknown TAK transport {transport!r}")
+    scheme = urlparse(url).scheme
+    use_pytak = (transport == "pytak"
+                 or (transport == "auto" and pytak_available()))
+    if use_pytak and scheme in PytakSender.SCHEMES:
+        return PytakSender(url, logger=logger, **kw)
+    return CotSender(url, logger=logger, **kw)

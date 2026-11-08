@@ -44,7 +44,7 @@ WORLD="${REPO_DIR}/src/custom_gz/worlds/${SWARM_WORLD:-swarm_drone.sdf}"
 ) &
 
 if [ "$1" = "--headless" ]; then
-    exec gz sim -s -r -v${GZ_VERBOSE:-2} "${WORLD}"
+    exec gz sim -s -r -v2 "${WORLD}"
 else
     exec gz sim -r -v2 "${WORLD}"
 fi

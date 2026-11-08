@@ -99,3 +99,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 # Expose necessary ports
 EXPOSE 2019-2030/udp 5501-5591 5760-5780 14550-14750/udp 9001-9052/udp
+
+# PyTAK: Cursor-on-Target transport for tak_bridge.py (TAK_TRANSPORT=auto
+# picks it when present) and receiver for tak_viewer.py. Own layer at the end
+# so adding it doesn't invalidate the cached ROS/ArduPilot layers above.
+RUN pip3 install --no-cache-dir pytak==7.6.1

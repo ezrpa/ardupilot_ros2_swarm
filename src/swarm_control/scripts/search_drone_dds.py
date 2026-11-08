@@ -26,6 +26,7 @@ camera_processor.PERSON_*). Behaviour:
 
 Camera / channel failures are non-fatal: the drone still flies its strip.
 """
+import math
 import time
 
 import rclpy
@@ -33,7 +34,8 @@ from geographic_msgs.msg import GeoPoseStamped
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 
 from base_drone_dds import BaseDrone, main
-from scripts.camera_processor import CameraProcessor, PERSON_DETECTORS
+from scripts.camera_processor import PERSON_DETECTORS
+from scripts.synthetic_camera import make_camera
 from scripts.drone_state import DroneState, FlightMode
 from scripts import sar_coordination as sar
 
@@ -46,7 +48,9 @@ class SearchDrone(BaseDrone):
             'camera_port': 0, 'instance': 0, 'swarm_instances': '',
             'logs_dir': '/root/logs', 'search_alt': 30.0,
             'confirm_alt': 15.0, 'confirm_radius': 8.0,
-            'ring_radius': 15.0, 'alt_step': 5.0, 'dwell_s': 10.0,
+            'ring_radius': 15.0, 'alt_step': 5.0, 'dwell_s': 2.0,
+            'leg_timeout': 90.0, 'level_tilt_deg': 3.0,
+            'level_timeout': 10.0,
             'rally_hold_s': 180.0, 'arrive_radius': 4.0,
             'converge_timeout': 120.0, 'standby_timeout': 600.0,
         }
@@ -61,7 +65,11 @@ class SearchDrone(BaseDrone):
         self.confirm_radius = float(g('confirm_radius'))
         self.ring_radius = float(g('ring_radius'))
         self.alt_step = float(g('alt_step'))
+        # dwell_s: settle time AFTER GPS-confirmed arrival, before capture.
         self.dwell_s = float(g('dwell_s'))
+        self.leg_timeout = float(g('leg_timeout'))
+        self.level_tilt = math.radians(float(g('level_tilt_deg')))
+        self.level_timeout = float(g('level_timeout'))
         self.rally_hold_s = float(g('rally_hold_s'))
         self.arrive_radius = float(g('arrive_radius'))
         self.converge_timeout = float(g('converge_timeout'))
@@ -69,7 +77,7 @@ class SearchDrone(BaseDrone):
         self.poll_s = 0.5           # call-channel poll interval
         self.converge_poll_s = 1.0  # arrival check / target re-send
 
-        self.camera = CameraProcessor(
+        self.camera = make_camera(
             self.drone_id, int(g('camera_port')), logger=self.get_logger(),
             detectors=PERSON_DETECTORS)
         self.bus = sar.SarBus(str(g('logs_dir')))
@@ -125,6 +133,63 @@ class SearchDrone(BaseDrone):
         self.send_position_command_dds(lat, lon, alt)
         rclpy.spin_once(self, timeout_sec=0.0)
 
+    def _fly_to(self, lat, lon, alt):
+        """Fly to a target and return (call, arrived) once the MEASURED GPS
+        is within arrive_radius (then settle dwell_s), on leg_timeout, or as
+        soon as another drone calls. A fixed wait is not enough: long legs
+        outlast it and the frame is taken in transit."""
+        self._goto(lat, lon, alt)
+        start = time.time()
+        arrived = False
+        while time.time() - start < self.leg_timeout:
+            rclpy.spin_once(self, timeout_sec=0.0)
+            call = self._foreign_call()
+            if call:
+                return call, False
+            if self.gps and sar.distance_m(
+                    self.gps[0], self.gps[1], lat, lon) <= self.arrive_radius:
+                arrived = True
+                break
+            time.sleep(self.poll_s)
+            self._goto(lat, lon, alt)  # re-send: GUIDED targets are cheap
+        if not arrived:
+            self.get_logger().warning(
+                f"[sar] target not reached in {self.leg_timeout:.0f}s")
+        call = self._wait(self.dwell_s)
+        if call:
+            return call, arrived
+        return self._wait_level(), arrived
+
+    def _wait_level(self):
+        """Hold until the airframe is level. The camera is body-fixed (no
+        gimbal): braking pitch of ~15 deg at 30 m shifts the nadir point ~9 m
+        (measured), enough to fail the confirm match. Returns a foreign call
+        if one arrives meanwhile."""
+        end = time.time() + self.level_timeout
+        while time.time() < end:
+            gp = getattr(self, 'current_geopose', None)
+            if gp is None or gp.get('tilt') is None \
+                    or gp['tilt'] <= self.level_tilt:
+                return None
+            call = self._wait(self.poll_s)
+            if call:
+                return call
+        self.get_logger().warning(
+            f"[sar] not level after {self.level_timeout:.0f}s - capturing")
+        return None
+
+    def _capture_here(self, index, alt, prefix="wp"):
+        """Capture geotagged with the MEASURED position and heading, never
+        the commanded target. alt is height above ground (the commanded one
+        when the measured height is unavailable)."""
+        lat, lon = (self.gps[0], self.gps[1]) if self.gps else (None, None)
+        rel = getattr(self, 'rel_alt', None)
+        h = rel() if callable(rel) else None
+        self.camera.capture(index, lat=lat, lon=lon,
+                            alt=alt if h is None else h, prefix=prefix,
+                            heading=self._heading())
+        return self.camera.last_meta or {}
+
     # ------------------------------------------------------------ mission
     def start_mission(self):
         if self.transformer is None:
@@ -142,16 +207,13 @@ class SearchDrone(BaseDrone):
                 break
             lat, lon = self.xy_to_latlon(wp[0], wp[1])
             alt = wp[2]
-            self._goto(lat, lon, alt)
             self._status(sar.SEARCHING, wp=i + 1, of=n)
             self._log(f"search wp {i + 1}/{n}: {lat:.7f}, {lon:.7f} @ {alt} m")
-            call = self._wait(self.dwell_s)
+            call, _ = self._fly_to(lat, lon, alt)
             if call:
                 break
 
-            self.camera.capture(i + 1, lat=lat, lon=lon, alt=alt,
-                                heading=self._heading())
-            meta = self.camera.last_meta or {}
+            meta = self._capture_here(i + 1, alt)
             det = sar.best_detection(meta.get('person_detections'))
             if det is None:
                 continue
@@ -191,15 +253,11 @@ class SearchDrone(BaseDrone):
         a foreign one that arrived meanwhile), or None to resume searching."""
         self._status(sar.CONFIRMING, wp=wp_index,
                      target_lat=det['lat'], target_lon=det['lon'])
-        self._goto(det['lat'], det['lon'], self.confirm_alt)
-        call = self._wait(self.dwell_s)
+        call, _ = self._fly_to(det['lat'], det['lon'], self.confirm_alt)
         if call:
             return call
 
-        self.camera.capture(wp_index, lat=det['lat'], lon=det['lon'],
-                            alt=self.confirm_alt, prefix="confirm",
-                            heading=self._heading())
-        meta = self.camera.last_meta or {}
+        meta = self._capture_here(wp_index, self.confirm_alt, prefix="confirm")
         confirmed = sar.match_detection(meta.get('person_detections'),
                                         det['lat'], det['lon'],
                                         self.confirm_radius)

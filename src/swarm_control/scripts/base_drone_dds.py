@@ -217,6 +217,10 @@ class BaseDrone(Node):
             'lon': msg.pose.position.longitude,
             'alt_amsl': msg.pose.position.altitude,
             'heading': (math.pi / 2.0 - yaw_enu) % (2.0 * math.pi),
+            # Total tilt from level (rad), sign-free: the body-fixed camera
+            # is only nadir when this is ~0 (braking pitch skews georef).
+            'tilt': math.acos(max(-1.0, min(1.0, 1.0 - 2.0 * (
+                q.x * q.x + q.y * q.y)))),
         }
 
     def rel_alt(self):
