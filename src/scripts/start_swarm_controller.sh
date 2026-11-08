@@ -32,6 +32,7 @@ timeout 5 ros2 topic list 2>/dev/null | grep -E "(drone|ap)"
 
 ros2 launch swarm_control compose_decentralized.launch.py \
     num_drones:="${NUM_DRONES}" \
-    sprayer_instances:="${SPRAYER_INSTANCES:-}"
+    sprayer_instances:="${SPRAYER_INSTANCES:-}" \
+    tak_url:="${TAK_URL:-}"
 
 

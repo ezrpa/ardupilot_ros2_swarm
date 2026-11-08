@@ -10,3 +10,6 @@
 .claude
 /src/terrain
 /logs
+# TAK client certs / keys (see tak/README.md)
+/tak/*
+!/tak/README.md
