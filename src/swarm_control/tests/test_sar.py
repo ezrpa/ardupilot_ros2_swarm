@@ -202,7 +202,6 @@ def _stub_ros():
     mod("geographic_msgs")
     mod("geographic_msgs.msg", GeoPoseStamped=Anything,
         GeoPointStamped=Anything)
-    mod("pyproj", Transformer=Anything)
 
 
 class FakeCamera:
@@ -317,7 +316,8 @@ def test_end_to_end_search_call_rally():
         types_ = [e.get("type") for e in evs]
         assert types_.count("b-r-f-h-c") == 1 and types_.count("b-t-f") == 1
         cas = next(e for e in evs if e.get("type") == "b-r-f-h-c")
-        assert abs(float(cas.find("point").get("lat")) - call["lat"]) < 1e-9
+        # CoT prints 8 decimals (~1 mm): compare at that resolution, not 1e-9.
+        assert abs(float(cas.find("point").get("lat")) - call["lat"]) <= 5e-9
         chat = next(e for e in evs if e.get("type") == "b-t-f")
         assert "SURVIVOR FOUND" in chat.find("detail/remarks").text
         assert chat.find("detail/__chat").get("chatroom") == "All Chat Rooms"

@@ -37,14 +37,15 @@ IMG_W, IMG_H = 640, 480
 ORIGIN_LAT = 40.072842
 ORIGIN_LON = -105.230575
 
-M_PER_DEG_LAT = 111_320.0
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "swarm_control", "scripts"))
+import geo  # noqa: E402
 
 
 def latlon_to_xy(lat, lon):
     """Field-local metres (x=east, y=north) from the shared origin."""
-    x = (lon - ORIGIN_LON) * M_PER_DEG_LAT * math.cos(math.radians(ORIGIN_LAT))
-    y = (lat - ORIGIN_LAT) * M_PER_DEG_LAT
-    return x, y
+    north, east = geo.ne_between(ORIGIN_LAT, ORIGIN_LON, lat, lon)
+    return east, north
 
 
 def load_frames(logs_dir):

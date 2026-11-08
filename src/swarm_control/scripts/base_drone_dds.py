@@ -11,9 +11,9 @@ from geometry_msgs.msg import PoseStamped
 from geographic_msgs.msg import GeoPoseStamped, GeoPointStamped
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
-from pyproj import Transformer
 
 from points_distributor import generate_circular_waypoints
+from scripts import geo
 from scripts.drone_state import DroneState, FlightMode
 
 from scripts.time_out_retry import TimeoutRetry
@@ -24,7 +24,7 @@ from scripts.time_out_retry import TimeoutRetry
 MIN_FLIGHT_ALT_M = 2.0
 
 # Metres per degree of latitude; longitude is scaled by cos(lat) at use.
-M_PER_DEG_LAT = 111111.0  # equirectangular, same as every other module
+M_PER_DEG_LAT = geo.M_PER_DEG_LAT
 
 TAKEOFF_ALT_M = 50.0
 TAKEOFF_ALT_FRACTION = 0.9   # "climb finished" threshold, fraction of target
@@ -244,9 +244,7 @@ class BaseDrone(Node):
         gp = self.current_geopose
         if gp is None:
             return None
-        m_per_deg_lon = M_PER_DEG_LAT * math.cos(math.radians(gp['lat']))
-        return math.hypot((gp['lat'] - lat) * M_PER_DEG_LAT,
-                          (gp['lon'] - lon) * m_per_deg_lon)
+        return geo.distance_m(gp['lat'], gp['lon'], lat, lon)
 
     def wait_until_arrived(self, lat, lon, timeout):
         """Spin until the vehicle actually reaches (lat, lon).
@@ -322,31 +320,21 @@ class BaseDrone(Node):
             )
 
     def setup_coordinate_transformer(self, lat_0, lon_0):
-        """Set up pyproj transformer for local to global conversions,
-        centred on (lat_0, lon_0)."""
-        # Create a local tangent plane projection centered at the origin
-        # Using Transverse Mercator projection
-        proj_string = (
-            f"+proj=tmerc +lat_0={lat_0} +lon_0={lon_0} "
-            f"+k=1 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
-        )
-        self.transformer = Transformer.from_crs(
-            proj_string,  # Local coordinate system
-            "EPSG:4326",  # WGS84
-            always_xy=True
-        )
+        """Local north/east frame centred on (lat_0, lon_0). Uses geo (the
+        ArduPilot/SITL model) so commanded waypoints, detections and SITL's
+        Gazebo GPS all agree; a pyproj transverse Mercator used to sit here
+        and read latitude ~0.26% differently from SITL."""
+        self.transformer = geo.LocalFrame(lat_0, lon_0)
 
         self.get_logger().info("Coordinate transformer initialized")
 
     def xy_to_latlon(self, x, y):
-        """Convert local NED coordinates to lat/lon using pyproj
+        """Convert local NED coordinates to lat/lon (geo.LocalFrame)
         Args:
             x: North position in meters (positive north)
             y: East position in meters (positive east)
         """
-        # pyproj expects x=east, y=north, so swap the inputs
-        lon, lat = self.transformer.transform(y, x)
-        return lat, lon
+        return self.transformer.to_latlon(x, y)
 
     def on_waypoint_reached(self, wp_index, lat, lon, alt):
         """Extension hook, called once the vehicle has actually arrived.

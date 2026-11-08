@@ -20,13 +20,14 @@ import numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "swarm_control", "scripts"))
 from camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
+import geo  # noqa: E402
 
 CP = CameraProcessor(0, 0)  # udp_port=0 -> no stream, detection still usable
 
 GREEN_BGR = (40, 120, 60)
 MAGENTA_BGR = (255, 0, 255)
 LAT, LON, ALT = 40.072842, -105.230575, 30.0
-M_PER_DEG_LAT = 111111.0
+M_PER_DEG_LAT = geo.M_PER_DEG_LAT
 
 
 def _frame_with_blob_at(px, py, radius=14):
@@ -38,9 +39,7 @@ def _frame_with_blob_at(px, py, radius=14):
 
 def _offset_m(det):
     """Detection offset from the capture point, in (north, east) metres."""
-    north = (det["lat"] - LAT) * M_PER_DEG_LAT
-    east = (det["lon"] - LON) * M_PER_DEG_LAT * math.cos(math.radians(LAT))
-    return north, east
+    return geo.ne_between(LAT, LON, det["lat"], det["lon"])
 
 
 def _single(frame, heading):

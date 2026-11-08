@@ -26,7 +26,12 @@ import math
 import os
 import time
 
-M_PER_DEG_LAT = 111111.0
+try:
+    import geo
+except ImportError:  # installed as the `scripts` python package
+    from scripts import geo
+
+M_PER_DEG_LAT = geo.M_PER_DEG_LAT
 
 # Drone SAR states (written to status_<inst>.json, shown in TAK remarks)
 SEARCHING = "searching"
@@ -38,15 +43,8 @@ RETURNING = "returning"
 SEARCH_COMPLETE = "search_complete"
 
 
-def distance_m(lat1, lon1, lat2, lon2):
-    dn = (lat2 - lat1) * M_PER_DEG_LAT
-    de = (lon2 - lon1) * M_PER_DEG_LAT * math.cos(math.radians(lat1))
-    return math.hypot(dn, de)
-
-
-def offset_latlon(lat, lon, north, east):
-    return (lat + north / M_PER_DEG_LAT,
-            lon + east / (M_PER_DEG_LAT * math.cos(math.radians(lat))))
+distance_m = geo.distance_m
+offset_latlon = geo.offset_latlon
 
 
 def best_detection(dets):

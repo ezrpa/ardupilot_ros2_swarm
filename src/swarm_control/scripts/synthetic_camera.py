@@ -27,12 +27,14 @@ import os
 
 try:
     from scripts import camera_processor as cp
+    from scripts import geo
 except ImportError:  # host-side tests run with scripts/ on sys.path
     import camera_processor as cp
+    import geo
 
 DEFAULT_MODELS_DIR = "/root/sim_models"
 FRAME_W, FRAME_H = 640, 480     # base_drone_cam/model.sdf image size
-METERS_PER_DEG_LAT = 111111.0   # same constant detect_color_blobs inverts
+METERS_PER_DEG_LAT = geo.M_PER_DEG_LAT  # georef and projection share geo
 
 # Colours are BGR. Each must fall inside its detector's HSV band
 # (camera_processor.WEED_HSV_* / PERSON_HSV_*) and the background must not.
@@ -96,8 +98,7 @@ def project(lat0, lon0, alt, heading, lat, lon, w=FRAME_W, h=FRAME_H):
     (lat0, lon0, alt AGL) with compass heading (rad). Exact inverse of the
     georeferencing in camera_processor.detect_color_blobs."""
     f_px = (w / 2.0) / math.tan(cp.CAMERA_HFOV_RAD / 2.0)
-    north = (lat - lat0) * METERS_PER_DEG_LAT
-    east = (lon - lon0) * METERS_PER_DEG_LAT * math.cos(math.radians(lat0))
+    north, east = geo.ne_between(lat0, lon0, lat, lon)
     psi = heading or 0.0
     forward = north * math.cos(psi) + east * math.sin(psi)
     right = -north * math.sin(psi) + east * math.cos(psi)
@@ -105,8 +106,7 @@ def project(lat0, lon0, alt, heading, lat, lon, w=FRAME_W, h=FRAME_H):
 
 
 def _ne_of(lat0, lon0, lat, lon):
-    return ((lat - lat0) * METERS_PER_DEG_LAT,
-            (lon - lon0) * METERS_PER_DEG_LAT * math.cos(math.radians(lat0)))
+    return geo.ne_between(lat0, lon0, lat, lon)
 
 
 def _rect_ne(cn, ce, length, width, yaw, along=0.0, across=0.0):

@@ -21,6 +21,11 @@ import threading
 import time
 
 try:
+    import geo
+except ImportError:  # installed as the `scripts` python package
+    from scripts import geo
+
+try:
     import cv2
     _CV2_OK = True
 except ImportError:  # pragma: no cover - depends on container image
@@ -110,9 +115,8 @@ def detect_color_blobs(frame, hsv_low, hsv_high, min_area_px,
                 psi = 0.0 if heading is None else heading
                 north = forward * math.cos(psi) - right * math.sin(psi)
                 east = forward * math.sin(psi) + right * math.cos(psi)
-                det["lat"] = lat + north / 111111.0
-                det["lon"] = lon + east / (
-                    111111.0 * math.cos(math.radians(lat)))
+                det["lat"], det["lon"] = geo.offset_latlon(lat, lon,
+                                                           north, east)
             detections.append(det)
         return detections
     except Exception:
@@ -173,9 +177,8 @@ def detect_person(frame, lat=None, lon=None, alt=None, heading=None,
                 psi = 0.0 if heading is None else heading
                 north = forward * math.cos(psi) - right * math.sin(psi)
                 east = forward * math.sin(psi) + right * math.cos(psi)
-                det["lat"] = lat + north / 111111.0
-                det["lon"] = lon + east / (
-                    111111.0 * math.cos(math.radians(lat)))
+                det["lat"], det["lon"] = geo.offset_latlon(lat, lon,
+                                                           north, east)
             # A blob cut by the frame edge can't be measured: a clipped
             # kayak or tarp can look exactly person-sized. Next frame (or
             # the confirm pass, which centres the target) will see it whole.

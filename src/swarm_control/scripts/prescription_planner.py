@@ -31,23 +31,22 @@ import math
 import os
 import time
 
+try:
+    import geo
+except ImportError:  # installed as the `scripts` python package
+    from scripts import geo
+
 FIELD_ORIGIN_LAT = 40.072842
 FIELD_ORIGIN_LON = -105.230575
-M_PER_DEG_LAT = 111111.0
+_FIELD = geo.LocalFrame(FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON)
 
 
 def latlon_to_ne(lat, lon):
-    north = (lat - FIELD_ORIGIN_LAT) * M_PER_DEG_LAT
-    east = (lon - FIELD_ORIGIN_LON) * M_PER_DEG_LAT * math.cos(
-        math.radians(FIELD_ORIGIN_LAT))
-    return north, east
+    return _FIELD.to_ne(lat, lon)
 
 
 def ne_to_latlon(north, east):
-    lat = FIELD_ORIGIN_LAT + north / M_PER_DEG_LAT
-    lon = FIELD_ORIGIN_LON + east / (
-        M_PER_DEG_LAT * math.cos(math.radians(FIELD_ORIGIN_LAT)))
-    return lat, lon
+    return _FIELD.to_latlon(north, east)
 
 
 def load_detections(logs_dir, mapper_ids):

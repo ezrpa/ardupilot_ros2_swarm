@@ -17,13 +17,18 @@ import json
 import math
 import os
 import random
+import sys
+
+# Local metres <-> GPS comes from the shared geo module (ArduPilot/SITL model).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "swarm_control", "scripts"))
+import geo  # noqa: E402
 
 # Must match LAT_BASE/LON_BASE in src/scripts/start_drone_container.sh and
 # FIELD_ORIGIN_LAT/LON in compose_decentralized.launch.py. The field origin
 # corresponds to Gazebo (45, 50) — drone 0's spawn/home.
 LAT_BASE = 40.072842
 LON_BASE = -105.230575
-METERS_PER_DEG_LAT = 111111.0
 
 DIAMETER_MIN = 1.2
 DIAMETER_MAX = 2.5
@@ -35,9 +40,7 @@ def gazebo_to_latlon(x, y, center_x, center_y):
     """Map Gazebo world x/y to lat/lon, with (center_x, center_y) = field origin."""
     north = y - center_y
     east = x - center_x
-    lat = LAT_BASE + north / METERS_PER_DEG_LAT
-    lon = LON_BASE + east / (METERS_PER_DEG_LAT * math.cos(math.radians(LAT_BASE)))
-    return lat, lon
+    return geo.offset_latlon(LAT_BASE, LON_BASE, north, east)
 
 
 def generate_weeds(count, seed, center, area):

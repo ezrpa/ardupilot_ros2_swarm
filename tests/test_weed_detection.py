@@ -12,6 +12,7 @@ import numpy as np
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, "src", "swarm_control", "scripts"))
 from camera_processor import CameraProcessor, CAMERA_HFOV_RAD  # noqa: E402
+import geo  # noqa: E402
 
 # udp_port=0 -> no stream is opened; detection methods still usable.
 CP = CameraProcessor(0, 0)
@@ -54,7 +55,8 @@ def test_georeference_nadir():
     assert len(dets) == 1
     f_px = (640 / 2.0) / math.tan(CAMERA_HFOV_RAD / 2.0)
     east_m = 100.0 / f_px * alt
-    exp_lon = lon + east_m / (111111.0 * math.cos(math.radians(lat)))
+    # Independent of geo's code path: same ArduPilot constant, plain formula.
+    exp_lon = lon + east_m / (geo.M_PER_DEG_LAT * math.cos(math.radians(lat)))
     assert abs(dets[0]["lon"] - exp_lon) < 1e-6, (dets[0]["lon"], exp_lon)
     assert abs(dets[0]["lat"] - lat) < 1e-6  # centered vertically -> no north offset
 

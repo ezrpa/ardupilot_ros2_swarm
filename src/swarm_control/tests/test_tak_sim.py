@@ -29,13 +29,13 @@ import synthetic_camera as sc  # noqa: E402
 import tak_cot  # noqa: E402
 import tak_viewer  # noqa: E402
 from sar_coordination import distance_m, best_detection  # noqa: E402
+import geo  # noqa: E402
 
 SKIP = object()
 
 
 def _offset(lat, lon, n, e):
-    return (lat + n / 111111.0,
-            lon + e / (111111.0 * math.cos(math.radians(lat))))
+    return geo.offset_latlon(lat, lon, n, e)
 
 
 # ------------------------------------------------------ synthetic camera

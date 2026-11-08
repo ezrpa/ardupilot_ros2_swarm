@@ -38,7 +38,9 @@ elif [ "${SPAWN_LAYOUT:-}" = "corners" ]; then
         split(h" "h" "(-h)" "(-h)" "h" "(-h)" "(-h)" "h" 0 "h" 0 "(-h)" "h" 0 "(-h)" 0", v, " ")
         k = inst % 8; n = v[2*k+1]; e = v[2*k+2]
         lat0 = 40.072842; lon0 = -105.230575
-        printf "%.7f %.7f\n", lat0 + n / 111111.0, lon0 + e / (111111.0 * cos(lat0 * 3.14159265358979 / 180))
+        m = 111318.84502145034   # ArduPilot LATLON_TO_M, same as geo.py
+        dlat = n / m
+        printf "%.7f %.7f\n", lat0 + dlat, lon0 + e / (m * cos((lat0 + dlat / 2) * 3.14159265358979 / 180))
     }')
 else
     LAT_OFFSET=$(awk -v base=40.072842 -v inst="$INSTANCE" 'BEGIN{printf "%.6f", base + (inst * 0.000045)}')

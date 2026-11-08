@@ -38,6 +38,11 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from xml.sax.saxutils import quoteattr, escape
 
+try:
+    import geo
+except ImportError:  # installed as the `scripts` python package
+    from scripts import geo
+
 UNKNOWN_ERR = 9999999.0
 
 # MIL-STD-2525 derived CoT types
@@ -203,13 +208,11 @@ def delete_event(target_uid, target_type=TYPE_SPOT_MAP, now=None):
 
 # ------------------------------------------------------------- geo helpers
 
-M_PER_DEG_LAT = 111111.0  # same equirectangular constant as the planner
+M_PER_DEG_LAT = geo.M_PER_DEG_LAT
 
 
 def ne_to_latlon(origin_lat, origin_lon, north, east):
-    lat = origin_lat + north / M_PER_DEG_LAT
-    lon = origin_lon + east / (M_PER_DEG_LAT * math.cos(math.radians(origin_lat)))
-    return lat, lon
+    return geo.offset_latlon(origin_lat, origin_lon, north, east)
 
 
 def course_speed(lat1, lon1, t1, lat2, lon2, t2):
@@ -217,8 +220,7 @@ def course_speed(lat1, lon1, t1, lat2, lon2, t2):
     dt = t2 - t1
     if dt <= 0:
         return None
-    dn = (lat2 - lat1) * M_PER_DEG_LAT
-    de = (lon2 - lon1) * M_PER_DEG_LAT * math.cos(math.radians(lat1))
+    dn, de = geo.ne_between(lat1, lon1, lat2, lon2)
     dist = math.hypot(dn, de)
     course = math.degrees(math.atan2(de, dn)) % 360.0
     return course, dist / dt

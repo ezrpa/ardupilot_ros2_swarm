@@ -33,6 +33,11 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, unquote
 
+try:
+    import geo
+except ImportError:  # installed as the `scripts` python package
+    from scripts import geo
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 PAGE_CANDIDATES = [os.path.join(HERE, "..", "viewer", "index.html"),
                    os.path.join(HERE, "viewer", "index.html")]
@@ -42,7 +47,7 @@ FEED_MAX = 80
 MIN_FOOTPRINT_AGL, MAX_FOOTPRINT_AGL = 5.0, 150.0
 TYPE_DELETE = "t-x-d-d"
 TYPE_CHAT = "b-t-f"
-M_PER_DEG = 111111.0
+M_PER_DEG = geo.M_PER_DEG_LAT
 
 
 def _parse_time(s):
@@ -54,10 +59,7 @@ def _parse_time(s):
         return None
 
 
-def _dist_m(a_lat, a_lon, b_lat, b_lon):
-    dn = (b_lat - a_lat) * M_PER_DEG
-    de = (b_lon - a_lon) * M_PER_DEG * math.cos(math.radians(a_lat))
-    return math.hypot(dn, de)
+_dist_m = geo.distance_m
 
 
 def parse_cot(data):

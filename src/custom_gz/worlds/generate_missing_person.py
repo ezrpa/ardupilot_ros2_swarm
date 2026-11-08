@@ -19,11 +19,16 @@ import json
 import math
 import os
 import random
+import sys
+
+# Local metres <-> GPS comes from the shared geo module (ArduPilot/SITL model).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "..", "swarm_control", "scripts"))
+import geo  # noqa: E402
 
 # Must match LAT_BASE/LON_BASE in src/scripts/start_drone_container.sh
 LAT_BASE = 40.072842
 LON_BASE = -105.230575
-METERS_PER_DEG_LAT = 111111.0
 
 SPAWN_XY = (52.5, 50.0)      # centre of the drone spawn cluster
 SPAWN_EXCLUSION_M = 20.0
@@ -54,9 +59,7 @@ PARTS = [
 
 def world_to_latlon(x, y):
     """World x = east, y = north (ENU) around the field GPS origin."""
-    lat = LAT_BASE + y / METERS_PER_DEG_LAT
-    lon = LON_BASE + x / (METERS_PER_DEG_LAT * math.cos(math.radians(LAT_BASE)))
-    return lat, lon
+    return geo.offset_latlon(LAT_BASE, LON_BASE, y, x)
 
 
 def place_person(seed, area):

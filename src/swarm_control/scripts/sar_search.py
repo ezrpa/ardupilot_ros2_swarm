@@ -26,7 +26,11 @@ import os
 import time
 from collections import deque
 
-M_PER_DEG_LAT = 111111.0
+try:
+    import geo
+except ImportError:  # installed as the `scripts` python package
+    from scripts import geo
+
 NEIGHBOURS = ((1, 0), (0, 1), (-1, 0), (0, -1))   # N, E, S, W in (row, col)
 ALGORITHMS = ("bfs", "dfs")
 
@@ -39,6 +43,7 @@ class Grid:
         self.lat0, self.lon0 = origin_lat, origin_lon
         self.size, self.n = float(size_m), int(n)
         self.cell_m = self.size / self.n
+        self.frame = geo.LocalFrame(origin_lat, origin_lon)
 
     def cells(self):
         return [(r, c) for r in range(self.n) for c in range(self.n)]
@@ -52,25 +57,18 @@ class Grid:
         return (-half + (r + 0.5) * self.cell_m,
                 -half + (c + 0.5) * self.cell_m)
 
-    def _m_per_deg_lon(self):
-        return M_PER_DEG_LAT * math.cos(math.radians(self.lat0))
-
     def center_latlon(self, cell):
-        n, e = self.center_ne(cell)
-        return (self.lat0 + n / M_PER_DEG_LAT,
-                self.lon0 + e / self._m_per_deg_lon())
+        return self.frame.to_latlon(*self.center_ne(cell))
 
     def corners_latlon(self, cell):
         n, e = self.center_ne(cell)
         h = self.cell_m / 2.0
-        return [(self.lat0 + (n + dn) / M_PER_DEG_LAT,
-                 self.lon0 + (e + de) / self._m_per_deg_lon())
+        return [self.frame.to_latlon(n + dn, e + de)
                 for dn, de in ((h, -h), (h, h), (-h, h), (-h, -h))]
 
     def cell_at(self, lat, lon):
         """Nearest cell to a position (clamped into the grid)."""
-        n = (lat - self.lat0) * M_PER_DEG_LAT
-        e = (lon - self.lon0) * self._m_per_deg_lon()
+        n, e = self.frame.to_ne(lat, lon)
         half = self.size / 2.0
         r = int(math.floor((n + half) / self.cell_m))
         c = int(math.floor((e + half) / self.cell_m))
