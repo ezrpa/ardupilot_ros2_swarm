@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Tests for the weed_field generator. Run directly: python3 tests/test_generate_weeds.py"""
+import sys
+import pytest
 import importlib.util
 import json
 import os
@@ -73,8 +75,4 @@ def test_write_model_outputs():
 
 
 if __name__ == "__main__":
-    for name, fn in sorted(globals().items()):
-        if name.startswith("test_"):
-            fn()
-            print(f"PASS {name}")
-    print("ALL PASS")
+    sys.exit(pytest.main([__file__, "-q"]))

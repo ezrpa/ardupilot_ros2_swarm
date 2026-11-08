@@ -8,6 +8,7 @@ dead launch parameter had already drifted to a wrong port formula.
 
 Run directly:  python3 tests/test_contracts.py
 """
+import pytest
 import json
 import os
 import re
@@ -106,14 +107,4 @@ def test_ros_domain_and_sysid_are_instance_plus_one():
 
 
 if __name__ == "__main__":
-    failed = 0
-    tests = sorted(n for n in dir() if n.startswith("test_"))
-    for name in tests:
-        try:
-            globals()[name]()
-            print(f"PASS {name}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"FAIL {name}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
-    sys.exit(1 if failed else 0)
+    sys.exit(pytest.main([__file__, "-q"]))

@@ -36,7 +36,7 @@ SWARM_MISSION=sar TAK_URL="udp://239.2.3.1:6969" USE_GAZEBO=1 ./start_swarm.sh 4
 | Drone node | `search_drone_dds.py` → `SearchDrone(BaseDrone)` |
 | Call channel + rally geometry (ROS-free) | `sar_coordination.py` |
 | Launch | `launch/sar_mission.launch.py` |
-| Tests (incl. 4-drone end-to-end mission with ROS stubbed) | `src/swarm_control/tests/test_sar.py` |
+| Tests (incl. 4-drone end-to-end mission with ROS stubbed) | `tests/test_sar.py` |
 
 A person is ~160 px at 30 m (6.4 cm/px), so the 30 m search grid (20 m
 spacing, ~41×31 m camera footprint) covers the area with overlap.

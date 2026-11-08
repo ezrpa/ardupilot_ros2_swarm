@@ -180,7 +180,7 @@ the same port as drone 1's camera stream (port contention footgun).
 TAK_URL="udp://239.2.3.1:6969" ./start_swarm.sh 4          # ATAK LAN multicast
 TAK_URL="tls://tak:8089" TAK_CERT=/root/tak/c.pem TAK_KEY=/root/tak/c.key \
   TAK_CA=/root/tak/ca.pem ./start_swarm.sh 4                 # TAK Server mTLS
-python3 src/swarm_control/tests/test_tak_bridge.py          # no ROS needed
+python3 tests/test_tak_bridge.py          # no ROS needed
 ```
 `tak_bridge.py` (launched in swarm_controller only when `TAK_URL` is set;
 `tak_url` launch arg) is read-only: it opens its OWN DDS participant per drone
@@ -198,7 +198,7 @@ Certs go in `./tak` (gitignored, mounted at `/root/tak`). AFSIM pairing
 ```bash
 ./start_tak_sim.sh 4          # SAR (verified); SWARM_MISSION=survey wired but untested
 # http://localhost:8088       (tak_viewer, compose profile "tak")
-python3 src/swarm_control/tests/test_tak_sim.py
+python3 tests/test_tak_sim.py
 ```
 SITL built-in physics replace Gazebo physics. `SIM_SENSORS=synthetic` makes the
 drone nodes' `make_camera()` (`synthetic_camera.py`) render nadir frames from the
@@ -226,7 +226,7 @@ any live mission's TAK picture. Use `TAK_UID_PREFIX` or unicast for experiments.
 ```bash
 SWARM_WORLD=swarm_drone_sar.sdf ./start_gazebo.sh &
 SWARM_MISSION=sar TAK_URL="udp://239.2.3.1:6969" USE_GAZEBO=1 ./start_swarm.sh 4
-python3 src/swarm_control/tests/test_sar.py   # 4-drone mission, ROS stubbed
+python3 tests/test_sar.py   # 4-drone mission, ROS stubbed
 ```
 `SWARM_MISSION=sar` (compose env) switches `start_swarm_controller.sh` to
 `sar_mission.launch.py`: `SearchDrone(BaseDrone)` nodes split a 120 m square

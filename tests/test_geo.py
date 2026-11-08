@@ -8,6 +8,7 @@ use exactly that model or positions disagree with the autopilot.
 
 Run directly:  python3 tests/test_geo.py
 """
+import pytest
 import os
 import re
 import sys
@@ -89,14 +90,4 @@ def test_ground_truth_files_use_geo():
 
 
 if __name__ == "__main__":
-    failed = 0
-    tests = sorted(n for n in dir() if n.startswith("test_"))
-    for name in tests:
-        try:
-            globals()[name]()
-            print(f"PASS {name}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"FAIL {name}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed}/{len(tests)} passed")
-    sys.exit(1 if failed else 0)
+    sys.exit(pytest.main([__file__, "-q"]))

@@ -2,12 +2,13 @@
 """Tests for the waypoint splitter: every drone must get a balanced 1/n share
 of the field with zero dropped waypoints, for ANY drone count.
 
-Run directly:  python3 src/swarm_control/tests/test_points_distributor.py
+Run directly:  python3 tests/test_points_distributor.py
 """
+import pytest
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "swarm_control"))
 
 from swarm_control.mission.points_distributor import generate_grid_waypoints, split_serpentine
 
@@ -60,8 +61,5 @@ def test_serpentine_order_is_efficient():
                 f"non-adjacent hop {d:.1f} m between {a} and {b}"
 
 
-if __name__ == '__main__':
-    test_balance_and_coverage()
-    test_more_drones_than_waypoints()
-    test_serpentine_order_is_efficient()
-    print("ALL SPLITTER TESTS PASSED")
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-q"]))

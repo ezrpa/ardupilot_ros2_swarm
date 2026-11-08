@@ -95,12 +95,12 @@ video port).
 | `src/custom_gz/worlds/swarm_drone.sdf` | Farm world with 4 camera drones |
 | `src/scripts/stitch_field_map.py` | Position-based field mosaic from geotagged frames |
 | `src/swarm_control/scripts/tak_bridge.py` / `tak_cot.py` | TAK bridge (DDS + mission logs → CoT) and stdlib CoT encoder/transports |
-| `src/swarm_control/tests/test_points_distributor.py` | Splitter balance/coverage tests |
-| `src/swarm_control/tests/test_tak_bridge.py` | CoT schema, bridge pipeline, UDP/file sender tests |
+| `tests/test_points_distributor.py` | Splitter balance/coverage tests |
+| `tests/test_tak_bridge.py` | CoT schema, bridge pipeline, UDP/file sender tests |
 | `src/swarm_control/scripts/search_drone_dds.py` / `sar_coordination.py` | SAR drone node; call channel + rally geometry |
 | `src/swarm_control/launch/sar_mission.launch.py` | SAR mission launch (`SWARM_MISSION=sar`) |
 | `src/custom_gz/worlds/swarm_drone_sar.sdf` / `generate_missing_person.py` | SAR world and missing-person generator |
-| `src/swarm_control/tests/test_sar.py` | SAR tests incl. a 4-drone end-to-end mission with ROS stubbed |
+| `tests/test_sar.py` | SAR tests incl. a 4-drone end-to-end mission with ROS stubbed |
 
 ## Roadmap (toward the STTR architecture)
 

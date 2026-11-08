@@ -88,7 +88,7 @@ thread behind the same never-raises `send()` contract. It sends UDP as
 32 like `CotSender`, and reconnects TCP/TLS every 5 s. `file://` always
 uses `CotSender`, because PyTAK opens files `wb+`, which truncates them.
 
-Tests (no ROS/Gazebo): `python3 src/swarm_control/tests/test_tak_sim.py`.
+Tests (no ROS/Gazebo): `python3 tests/test_tak_sim.py`.
 The OpenCV cases need cv2 and the PyTAK cases need pytak; each is skipped
 when its module is missing.
 
@@ -162,7 +162,7 @@ a video button. Mind the QGC port-5600 clash noted in `CLAUDE.md`.
 ### Testing without a TAK client
 
 ```bash
-python3 src/swarm_control/tests/test_tak_bridge.py      # unit + socket tests
+python3 tests/test_tak_bridge.py      # unit + socket tests
 ```
 
 ```bash

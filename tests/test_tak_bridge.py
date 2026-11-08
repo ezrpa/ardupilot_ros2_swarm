@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Tests for the TAK/CoT integration (no ROS, no TAK install needed).
 
-Run directly:  python3 src/swarm_control/tests/test_tak_bridge.py
+Run directly:  python3 tests/test_tak_bridge.py
 """
+import pytest
 import json
 import os
 import socket
@@ -10,7 +11,7 @@ import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "swarm_control"))
 
 from swarm_control.tak import cot as tak_cot  # noqa: E402
 from swarm_control.tak.picture import SwarmTakBridge, FIELD_ORIGIN_LAT, FIELD_ORIGIN_LON  # noqa: E402
@@ -214,8 +215,4 @@ def test_sar_page_survives_link_outage():
 
 
 if __name__ == "__main__":
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    for t in tests:
-        t()
-        print(f"PASS {t.__name__}")
-    print(f"{len(tests)} tests passed")
+    sys.exit(pytest.main([__file__, "-q"]))

@@ -10,6 +10,7 @@ change, and say so in the commit:
     python3 tests/test_golden.py            # check
     python3 tests/test_golden.py --regen    # rewrite tests/golden/*.json
 """
+import pytest
 import json
 import math
 import os
@@ -206,6 +207,14 @@ def case_tak_mapping():
 CASES = {n[5:]: f for n, f in sorted(globals().items()) if n.startswith("case_")}
 
 
+@pytest.mark.parametrize("name", sorted(CASES))
+def test_golden(name):
+    path = os.path.join(GOLD, f"{name}.json")
+    assert os.path.exists(path), f"no golden for {name}: run with --regen at the branch point"
+    diffs = _close(json.load(open(path)), CASES[name]())
+    assert not diffs, f"{len(diffs)} differences, e.g.\n" + "\n".join(diffs[:5])
+
+
 def run(regen=False):
     os.makedirs(GOLD, exist_ok=True)
     failed = 0
@@ -233,4 +242,6 @@ def run(regen=False):
 
 
 if __name__ == "__main__":
-    sys.exit(1 if run(regen="--regen" in sys.argv) else 0)
+    if "--regen" in sys.argv:
+        sys.exit(1 if run(regen=True) else 0)
+    sys.exit(pytest.main([__file__, "-q"]))

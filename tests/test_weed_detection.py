@@ -2,6 +2,7 @@
 """Tests for CameraProcessor._detect_weeds. Run directly:
     python3 tests/test_weed_detection.py
 Needs cv2 + numpy on the host (venv-ardupilot has both)."""
+import pytest
 import math
 import os
 import sys
@@ -66,8 +67,4 @@ def test_never_raises_on_garbage():
 
 
 if __name__ == "__main__":
-    for name, fn in sorted(globals().items()):
-        if name.startswith("test_"):
-            fn()
-            print(f"PASS {name}")
-    print("ALL PASS")
+    sys.exit(pytest.main([__file__, "-q"]))

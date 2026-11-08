@@ -7,8 +7,9 @@ an end-to-end swarm run: four REAL SearchDrone mission loops in threads with
 ROS stubbed out, a fake camera that sees the person only inside its ground
 footprint, and fake GPS that flies to each commanded target.
 
-Run directly:  python3 src/swarm_control/tests/test_sar.py
+Run directly:  python3 tests/test_sar.py
 """
+import pytest
 import importlib.util
 import json
 import math
@@ -20,9 +21,8 @@ import time
 import types
 import xml.etree.ElementTree as ET
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-PKG = os.path.dirname(HERE)                       # src/swarm_control
-REPO = os.path.dirname(os.path.dirname(PKG))
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PKG = os.path.join(REPO, "src", "swarm_control")
 sys.path.insert(0, PKG)                           # the swarm_control package
 
 from swarm_control.core import config  # noqa: E402
@@ -92,8 +92,7 @@ def test_detection_selection():
 
 def test_person_detector_vs_farm_palette():
     if not _CV:
-        print("  (skipped: cv2/numpy not installed)")
-        return
+        pytest.skip("cv2/numpy not installed")
     from swarm_control.perception.camera_processor import (detect_color_blobs, PERSON_HSV_LOW,
                                   PERSON_HSV_HIGH, PERSON_MIN_AREA_PX,
                                   CAMERA_HFOV_RAD)
@@ -404,8 +403,4 @@ def test_grid_search_from_separate_launch_points():
 
 
 if __name__ == "__main__":
-    tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    for t in tests:
-        t()
-        print(f"PASS {t.__name__}")
-    print(f"{len(tests)} tests passed")
+    sys.exit(pytest.main([__file__, "-q"]))

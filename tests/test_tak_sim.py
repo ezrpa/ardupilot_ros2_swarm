@@ -8,8 +8,9 @@
   * tak_viewer.Picture: CoT parsing, tracks, coverage footprints, deletes,
     CASEVAC + GeoChat feed.
 
-Run directly:  python3 src/swarm_control/tests/test_tak_sim.py
+Run directly:  python3 tests/test_tak_sim.py
 """
+import pytest
 import json
 import math
 import os
@@ -18,9 +19,9 @@ import sys
 import tempfile
 import time
 
-HERE = os.path.dirname(__file__)
-sys.path.insert(0, os.path.join(HERE, '..'))
-MODELS = os.path.join(HERE, '..', '..', 'custom_gz', 'models')
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(REPO, "src", "swarm_control"))
+MODELS = os.path.join(REPO, "src", "custom_gz", "models")
 if not os.path.isdir(MODELS):  # inside the container: compose mount
     MODELS = os.environ.get("SIM_MODELS_DIR", "/root/sim_models")
 
@@ -31,7 +32,6 @@ from swarm_control.tak import viewer as tak_viewer  # noqa: E402
 from swarm_control.mission.sar_coordination import distance_m, best_detection  # noqa: E402
 from swarm_control.core import geo  # noqa: E402
 
-SKIP = object()
 
 
 def _offset(lat, lon, n, e):
@@ -55,7 +55,7 @@ def test_projection_inverts_georef():
 
 def test_weeds_detected_and_georeferenced():
     if not cp._CV2_OK:
-        return SKIP
+        pytest.skip("cv2 not installed")
     weeds, _ = sc.load_ground_truth(MODELS)
     assert len(weeds) >= 5
     for hd in (0.0, 1.1, math.pi):
@@ -72,7 +72,7 @@ def test_weeds_detected_and_georeferenced():
 
 def test_person_detected_at_search_and_confirm_alt():
     if not cp._CV2_OK:
-        return SKIP
+        pytest.skip("cv2 not installed")
     _, person = sc.load_ground_truth(MODELS)
     assert person
     areas = {}
@@ -91,7 +91,7 @@ def test_person_detected_at_search_and_confirm_alt():
 
 def test_bands_do_not_cross_trigger():
     if not cp._CV2_OK:
-        return SKIP
+        pytest.skip("cv2 not installed")
     weeds, person = sc.load_ground_truth(MODELS)
     f = sc.render_frame(person["lat"], person["lon"], 30.0, 0.0, [], person)
     assert not cp.detect_color_blobs(f, *cp.DEFAULT_DETECTORS["weed"])
@@ -101,7 +101,7 @@ def test_bands_do_not_cross_trigger():
 
 def test_synthetic_camera_writes_sidecar_and_factory():
     if not cp._CV2_OK:
-        return SKIP
+        pytest.skip("cv2 not installed")
     tmp = tempfile.mkdtemp()
     _, person = sc.load_ground_truth(MODELS)
     cam = sc.SyntheticCamera(2, out_dir=tmp, models_dir=MODELS,
@@ -155,7 +155,7 @@ def _wait(pred, timeout=3.0):
 
 def test_pytak_udp_and_tcp():
     if not tak_cot.pytak_available():
-        return SKIP
+        pytest.skip("pytak not installed")
     xml = tak_cot.drone_event("u1", "SEARCH-1", 40.07, -105.23, 1600.0)
     r = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     r.bind(("127.0.0.1", 0))
@@ -185,7 +185,7 @@ def test_pytak_udp_and_tcp():
 
 def test_pytak_unreachable_never_raises():
     if not tak_cot.pytak_available():
-        return SKIP
+        pytest.skip("pytak not installed")
     s = tak_cot.make_sender("tcp://127.0.0.1:1", "pytak",
                             logger=lambda m: None)
     time.sleep(0.3)
@@ -247,20 +247,4 @@ def test_viewer_parse_robust():
 
 
 if __name__ == "__main__":
-    tests = [(n, f) for n, f in sorted(globals().items())
-             if n.startswith("test_") and callable(f)]
-    failed = skipped = 0
-    for name, fn in tests:
-        try:
-            res = fn()
-            if res is SKIP:
-                skipped += 1
-                print(f"SKIP {name}")
-            else:
-                print(f"ok   {name}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"FAIL {name}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed - skipped} passed, {skipped} skipped, "
-          f"{failed} failed")
-    sys.exit(1 if failed else 0)
+    sys.exit(pytest.main([__file__, "-q"]))

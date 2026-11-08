@@ -10,6 +10,7 @@
 Run directly:
     python3 tests/test_mission_integrity.py
 """
+import pytest
 import math
 import os
 import sys
@@ -102,10 +103,6 @@ def test_magnitude_matches_pinhole_geometry():
 
 # -------------------------------------------------------------------- liveness
 
-class SkipTest(Exception):
-    """Raised when a test needs ROS, which only exists inside the container."""
-
-
 try:
     from swarm_control.nodes.base_drone import BaseDrone  # needs rclpy + ardupilot_msgs
     _HAVE_ROS = True
@@ -129,7 +126,7 @@ class _FakeDrone:
 
     def __getattr__(self, name):
         if not _HAVE_ROS:
-            raise SkipTest("needs ROS (run inside swarm_controller)")
+            pytest.skip("needs ROS (run inside the swarm_controller image)")
         if name in ('is_airborne', 'rel_alt', 'distance_to'):
             return getattr(BaseDrone, name).__get__(self, _FakeDrone)
         raise AttributeError(name)
@@ -173,23 +170,5 @@ def test_arrival_distance_agrees_with_sar_coordination():
                    - sar.distance_m(LAT, LON, lat, lon)) < 1e-6
 
 
-if __name__ == '__main__':
-    mod = sys.modules[__name__]
-    tests = [n for n in dir(mod) if n.startswith('test_')]
-    failed = skipped = 0
-    for name in sorted(tests):
-        try:
-            getattr(mod, name)()
-            print(f"PASS {name}")
-        except SkipTest as e:
-            skipped += 1
-            print(f"SKIP {name}: {e}")
-        except AssertionError as e:
-            failed += 1
-            print(f"FAIL {name}: {e}")
-        except Exception as e:  # noqa: BLE001
-            failed += 1
-            print(f"ERROR {name}: {type(e).__name__}: {e}")
-    print(f"\n{len(tests) - failed - skipped}/{len(tests)} passed, "
-          f"{skipped} skipped, {failed} failed")
-    sys.exit(1 if failed else 0)
+if __name__ == "__main__":
+    sys.exit(pytest.main([__file__, "-q"]))
