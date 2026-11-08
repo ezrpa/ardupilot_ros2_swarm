@@ -24,7 +24,7 @@ from scripts.time_out_retry import TimeoutRetry
 MIN_FLIGHT_ALT_M = 2.0
 
 # Metres per degree of latitude; longitude is scaled by cos(lat) at use.
-M_PER_DEG_LAT = 111320.0
+M_PER_DEG_LAT = 111111.0  # equirectangular, same as every other module
 
 TAKEOFF_ALT_M = 50.0
 TAKEOFF_ALT_FRACTION = 0.9   # "climb finished" threshold, fraction of target

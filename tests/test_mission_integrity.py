@@ -158,8 +158,20 @@ def test_unknown_pose_is_not_airborne():
 def test_distance_to_is_metres():
     d = _FakeDrone(armed=True, alt_amsl=1616.0)
     assert d.distance_to(LAT, LON) < 0.01
-    north_100m = LAT + 100.0 / 111320.0
+    north_100m = LAT + 100.0 / M_PER_DEG_LAT
     assert abs(d.distance_to(north_100m, LON) - 100.0) < 1.0
+
+
+def test_arrival_distance_agrees_with_sar_coordination():
+    """BaseDrone.distance_to (mission arrival) and sar_coordination.distance_m
+    (SAR rally arrival) once used different metres-per-degree (111320 vs
+    111111): the same point read ~0.2% differently depending on the caller."""
+    import sar_coordination as sar
+    d = _FakeDrone(armed=True, alt_amsl=1616.0)
+    for dn, de in ((100.0, 0.0), (0.0, 100.0), (-60.0, 45.0)):
+        lat, lon = sar.offset_latlon(LAT, LON, dn, de)
+        assert abs(d.distance_to(lat, lon)
+                   - sar.distance_m(LAT, LON, lat, lon)) < 1e-6
 
 
 if __name__ == '__main__':
